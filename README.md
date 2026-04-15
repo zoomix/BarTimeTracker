@@ -1,25 +1,28 @@
 # BarTimeTracker
 
-macOS menu bar app. Tracks screen on/off times and project work sessions. Always running, no dock icon.
+macOS menu bar app. Tracks screen activity and project work sessions. Always running, no dock icon.
 
 ## What it does
 
 **Screen tracking**
-- Detects screen wake and sleep via macOS system notifications
-- Records timestamp for every on/off event
-- Shows all today's events in menu
-- Calculates total screen-on time for today
+- Detects screen wake, sleep, screensaver start/stop via macOS system notifications
+- Records timestamp for every event
+- Calculates total active screen time for today (screensaver = away)
 
 **Project tracking**
-- Every 15 minutes: popup asks what you're working on
-- Each answer (or manual set) creates a timestamped project entry
-- Skips prompt if screen is off
+- Periodic popup asks what you're working on (configurable: 5 / 15 / 30 / 60 min)
+- Each answer creates a timestamped project entry — including every check-in, not just changes
+- Popup skips if screen is off, screensaver is running, or Focus/DND is active
+- Prompts chain: next fires only after current is dismissed — no stacking after long absence
+- Window appears without stealing keyboard focus
 
 **Menu shows**
-- Total on-time today
+- Total active time today
 - First screen-on time today
-- All wake/sleep events with timestamps
+- All screen events with timestamps (▶ on / ■ off / ◉ saver / ○ saver)
 - Current project
+- Last check (time ago) + next check (time until + clock time)
+- Interval selector submenu
 
 ## Data
 
@@ -34,8 +37,10 @@ Format:
 ```json
 {
   "screenEvents": [
-    { "kind": "on",  "time": "2026-04-15T08:42:00Z" },
-    { "kind": "off", "time": "2026-04-15T12:00:00Z" }
+    { "kind": "on",           "time": "2026-04-15T08:42:00Z" },
+    { "kind": "screensaverOn","time": "2026-04-15T11:00:00Z" },
+    { "kind": "screensaverOff","time": "2026-04-15T11:05:00Z" },
+    { "kind": "off",          "time": "2026-04-15T18:00:00Z" }
   ],
   "projectEntries": [
     { "project": "ClientWork", "time": "2026-04-15T09:00:00Z" },
@@ -62,7 +67,10 @@ open BarTimeTracker.app
 
 | Action | Result |
 |--------|--------|
-| Click ⏱ icon | Show today's screen events + project |
+| Click ⏱ icon | Open menu with today's events + project status |
 | Set project… | Create new project entry now |
-| 15-min popup → Save | Create new project entry |
-| 15-min popup → Skip | No entry created |
+| Check every… | Set prompt interval (5 / 15 / 30 / 60 min) — persists across restarts |
+| Popup → Save | Create timestamped project entry |
+| Popup → Skip | No entry, next prompt scheduled |
+| Popup → Esc | Same as Skip |
+| Click in popup | Focus window to type / use dropdown |
