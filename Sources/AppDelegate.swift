@@ -171,6 +171,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return h > 0 ? "\(h)h \(m)m" : "\(m)m"
     }
 
+    func screensaverTimeout() -> TimeInterval {
+        // idleTime first (active setting), lastDelayTime as fallback (last known before disabled)
+        for key in ["idleTime", "lastDelayTime"] {
+            if let val = CFPreferencesCopyValue(
+                key as CFString,
+                "com.apple.screensaver" as CFString,
+                kCFPreferencesCurrentUser,
+                kCFPreferencesCurrentHost
+            ) as? NSNumber, val.intValue > 0 {
+                return val.doubleValue
+            }
+        }
+        return 0
+    }
+
     // MARK: - Status Item
 
     func setupStatusItem() {
@@ -211,15 +226,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             item.isEnabled = false
             menu.addItem(item)
         } else {
+            let timeout = screensaverTimeout()
             for event in todayScreenEvents {
-                let icon: String
+                let label: String?
                 switch event.kind {
-                case .on:            icon = "▶ on  "
-                case .off:           icon = "■ off "
-                case .screensaverOn: icon = "◉ saver"
-                case .screensaverOff:icon = "○ saver"
+                case .on:
+                    label = "▶ on    \(timeFmt.string(from: event.time))"
+                case .off:
+                    label = "■ off   \(timeFmt.string(from: event.time))"
+                case .screensaverOn:
+                    let leftTime = event.time.addingTimeInterval(-timeout)
+                    let mark = timeout > 0 ? "" : "~"
+                    label = "← left  \(mark)\(timeFmt.string(from: leftTime))"
+                case .screensaverOff:
+                    label = nil  // covered by next on event
                 }
-                let item = NSMenuItem(title: "\(icon)  \(timeFmt.string(from: event.time))", action: nil, keyEquivalent: "")
+                guard let label else { continue }
+                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
                 item.isEnabled = false
                 menu.addItem(item)
             }
