@@ -2,7 +2,13 @@ import AppKit
 import Foundation
 
 struct ScreenEvent: Codable {
-    enum Kind: String, Codable { case on, off }
+    enum Kind: String, Codable {
+        case on, off
+        case screensaverOn, screensaverOff
+
+        /// True when this event means user is away from screen
+        var isAway: Bool { self == .off || self == .screensaverOn }
+    }
     let kind: Kind
     let time: Date
 }
@@ -95,10 +101,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                        name: NSWorkspace.screensDidWakeNotification, object: nil)
         nc.addObserver(self, selector: #selector(screenSlept),
                        name: NSWorkspace.screensDidSleepNotification, object: nil)
+
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(self, selector: #selector(screensaverStarted),
+                        name: .init("com.apple.screensaver.didstart"), object: nil)
+        dnc.addObserver(self, selector: #selector(screensaverStopped),
+                        name: .init("com.apple.screensaver.didstop"), object: nil)
     }
 
-    @objc func screenWoke() { recordScreenEvent(.on) }
-    @objc func screenSlept() { recordScreenEvent(.off) }
+    @objc func screenWoke()        { recordScreenEvent(.on) }
+    @objc func screenSlept()       { recordScreenEvent(.off) }
+    @objc func screensaverStarted(){ recordScreenEvent(.screensaverOn) }
+    @objc func screensaverStopped(){ recordScreenEvent(.screensaverOff) }
 
     func recordScreenEvent(_ kind: ScreenEvent.Kind) {
         var data = loadData()
@@ -140,13 +154,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var lastOn: Date?
 
         for event in events {
-            switch event.kind {
-            case .on:  lastOn = event.time
-            case .off:
-                if let on = lastOn {
-                    total += event.time.timeIntervalSince(on)
-                    lastOn = nil
-                }
+            if event.kind == .on || event.kind == .screensaverOff {
+                lastOn = event.time
+            } else if event.kind.isAway, let on = lastOn {
+                total += event.time.timeIntervalSince(on)
+                lastOn = nil
             }
         }
         if let on = lastOn { total += Date().timeIntervalSince(on) }
@@ -185,7 +197,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         totalItem.isEnabled = false
         menu.addItem(totalItem)
 
-        if let first = todayScreenEvents.first(where: { $0.kind == .on }) {
+        if let first = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff }) {
             let item = NSMenuItem(title: "First on: \(timeFmt.string(from: first.time))", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
@@ -200,9 +212,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         } else {
             for event in todayScreenEvents {
-                let label = event.kind == .on ? "▶ on   \(timeFmt.string(from: event.time))"
-                                              : "■ off  \(timeFmt.string(from: event.time))"
-                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
+                let icon: String
+                switch event.kind {
+                case .on:            icon = "▶ on  "
+                case .off:           icon = "■ off "
+                case .screensaverOn: icon = "◉ saver"
+                case .screensaverOff:icon = "○ saver"
+                }
+                let item = NSMenuItem(title: "\(icon)  \(timeFmt.string(from: event.time))", action: nil, keyEquivalent: "")
                 item.isEnabled = false
                 menu.addItem(item)
             }
@@ -260,8 +277,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         projectTimer = Timer.scheduledTimer(withTimeInterval: promptInterval, repeats: false) { [weak self] _ in
             guard let self else { return }
             let data = self.loadData()
-            let screenIsOn = data.screenEvents.filter { Calendar.current.isDateInToday($0.time) }.last?.kind != .off
-            if screenIsOn {
+            let userActive = !(data.screenEvents.filter { Calendar.current.isDateInToday($0.time) }.last?.kind.isAway ?? false)
+            if userActive {
                 self.askForProject(isAutoPrompt: true)
             } else {
                 // Screen off — skip popup but still schedule next
