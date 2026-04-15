@@ -34,6 +34,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var promptInterval: TimeInterval = 15 * 60
 
     let intervalKey = "promptInterval"
+    let logoutDateKey = "logoutDate"
+
+    var isLoggedOut: Bool {
+        guard let date = UserDefaults.standard.object(forKey: logoutDateKey) as? Date else { return false }
+        return Calendar.current.isDateInToday(date)
+    }
+
     let intervalOptions: [(label: String, seconds: TimeInterval)] = [
         ("5 min",  5  * 60),
         ("15 min", 15 * 60),
@@ -262,7 +269,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         lastItem.isEnabled = false
         menu.addItem(lastItem)
 
-        let nextLabel = nextPromptDate.map { "Next check: \(timeUntil($0))" } ?? "Next check: —"
+        let nextLabel: String
+        if isLoggedOut {
+            nextLabel = "Next check: logged out for today"
+        } else {
+            nextLabel = nextPromptDate.map { "Next check: \(timeUntil($0))" } ?? "Next check: —"
+        }
         let nextItem = NSMenuItem(title: nextLabel, action: nil, keyEquivalent: "")
         nextItem.isEnabled = false
         menu.addItem(nextItem)
@@ -285,6 +297,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(intervalItem)
 
         menu.addItem(NSMenuItem.separator())
+        if isLoggedOut {
+            let item = NSMenuItem(title: "Resume tracking", action: #selector(resumeTracking), keyEquivalent: "")
+            item.target = self
+            menu.addItem(item)
+        } else {
+            let item = NSMenuItem(title: "Log out for the day", action: #selector(logoutForDay), keyEquivalent: "")
+            item.target = self
+            menu.addItem(item)
+        }
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         statusItem.menu = menu
@@ -294,7 +316,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Project Timer
 
+    @objc func logoutForDay() {
+        projectTimer?.invalidate()
+        projectTimer = nil
+        nextPromptDate = nil
+        UserDefaults.standard.set(Date(), forKey: logoutDateKey)
+        recordProjectEntry("~logged out~")
+        promptWindow?.close()
+        promptWindow = nil
+    }
+
+    @objc func resumeTracking() {
+        UserDefaults.standard.removeObject(forKey: logoutDateKey)
+        recordProjectEntry("~resumed~")
+        scheduleProjectTimer()
+    }
+
     func scheduleProjectTimer() {
+        guard !isLoggedOut else { return }
         projectTimer?.invalidate()
         nextPromptDate = Date().addingTimeInterval(promptInterval)
         projectTimer = Timer.scheduledTimer(withTimeInterval: promptInterval, repeats: false) { [weak self] _ in
