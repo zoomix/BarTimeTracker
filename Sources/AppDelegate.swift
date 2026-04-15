@@ -22,6 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var projectTimer: Timer?
     var currentProject: String = ""
     var promptWindow: ProjectPromptWindow?
+    var isFocusActive: Bool = false
 
     // MARK: - Storage
 
@@ -62,12 +63,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Restore last known project from stored entries
         let data = loadData()
         currentProject = data.projectEntries.last?.project ?? ""
 
         setupStatusItem()
         setupScreenMonitoring()
+        setupFocusMonitoring()
         recordScreenEvent(.on)
         scheduleProjectTimer()
     }
@@ -92,6 +93,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         data.screenEvents.append(ScreenEvent(kind: kind, time: Date()))
         saveData(data)
     }
+
+    // MARK: - Focus Monitoring
+
+    func setupFocusMonitoring() {
+        // Read current state (works for DND and Focus modes on macOS 12+)
+        isFocusActive = UserDefaults(suiteName: "com.apple.notificationcenterui")?
+            .bool(forKey: "doNotDisturb") ?? false
+
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(self, selector: #selector(focusDidStart),
+                        name: .init("com.apple.notificationcenterui.dndstart"), object: nil)
+        dnc.addObserver(self, selector: #selector(focusDidEnd),
+                        name: .init("com.apple.notificationcenterui.dndend"), object: nil)
+    }
+
+    @objc func focusDidStart() { isFocusActive = true }
+    @objc func focusDidEnd()   { isFocusActive = false }
 
     // MARK: - Project Entries
 
@@ -233,6 +251,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func askForProject(isAutoPrompt: Bool) {
         DispatchQueue.main.async {
+            // Skip if Focus/DND is active — reschedule and try again later
+            if isAutoPrompt && self.isFocusActive {
+                self.scheduleProjectTimer()
+                return
+            }
+
             // Don't stack prompts
             guard self.promptWindow == nil else { return }
 
