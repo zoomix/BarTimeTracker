@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var projectTimer: Timer?
     var currentProject: String = ""
+    var promptWindow: ProjectPromptWindow?
 
     // MARK: - Storage
 
@@ -198,13 +199,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Project Timer
 
     func scheduleProjectTimer() {
-        projectTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
+        projectTimer?.invalidate()
+        projectTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: false) { [weak self] _ in
             guard let self else { return }
             let data = self.loadData()
             let screenIsOn = data.screenEvents.filter { Calendar.current.isDateInToday($0.time) }.last?.kind != .off
-            if screenIsOn { self.askForProject(isAutoPrompt: true) }
+            if screenIsOn {
+                self.askForProject(isAutoPrompt: true)
+            } else {
+                // Screen off — skip popup but still schedule next
+                self.scheduleProjectTimer()
+            }
         }
         RunLoop.main.add(projectTimer!, forMode: .common)
+    }
+
+    func recentProjects() -> [String] {
+        let entries = loadData().projectEntries
+        var seen = Set<String>()
+        var result: [String] = []
+        for entry in entries.reversed() {
+            if seen.insert(entry.project).inserted {
+                result.append(entry.project)
+                if result.count >= 100 { break }
+            }
+        }
+        return result
     }
 
     @objc func askForProjectManually() {
@@ -213,27 +233,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func askForProject(isAutoPrompt: Bool) {
         DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = isAutoPrompt ? "What are you working on?" : "Set current project"
-            if isAutoPrompt { alert.informativeText = "15-minute check-in" }
-            alert.alertStyle = .informational
-            alert.addButton(withTitle: "Save")
-            alert.addButton(withTitle: "Skip")
+            // Don't stack prompts
+            guard self.promptWindow == nil else { return }
 
-            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-            input.placeholderString = "Project name…"
-            if !self.currentProject.isEmpty { input.stringValue = self.currentProject }
-            alert.accessoryView = input
+            let window = ProjectPromptWindow(
+                currentProject: self.currentProject,
+                recentProjects: self.recentProjects()
+            )
+            self.promptWindow = window
 
-            NSApp.activate(ignoringOtherApps: true)
-
-            if alert.runModal() == .alertFirstButtonReturn {
-                let val = input.stringValue.trimmingCharacters(in: .whitespaces)
-                if !val.isEmpty {
-                    self.currentProject = val
-                    self.recordProjectEntry(val)   // new entry every time
-                }
+            window.onSave = { [weak self] val in
+                guard let self else { return }
+                self.currentProject = val
+                self.recordProjectEntry(val)
             }
+
+            window.onDismiss = { [weak self] in
+                guard let self else { return }
+                self.promptWindow = nil
+                if isAutoPrompt { self.scheduleProjectTimer() }
+            }
+
+            window.show()
         }
     }
 }
