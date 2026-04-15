@@ -301,9 +301,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timeFmt.timeStyle = .short
         timeFmt.dateStyle = .none
 
-        // Total on-time
-        let total = totalOnTime(events: todayScreenEvents)
-        let totalItem = NSMenuItem(title: "Total on today: \(formatDuration(total))", action: nil, keyEquivalent: "")
+        // Project entries and first-on anchor (needed for break calc + span durations)
+        let allTodayProjects = appData.projectEntries
+            .filter { Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~") }
+            .sorted { $0.time < $1.time }
+        let firstOnTime = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+
+        // Total worked = screen on-time minus break intervals
+        let screenTime = totalOnTime(events: todayScreenEvents)
+        let dayStart = firstOnTime ?? Calendar.current.startOfDay(for: Date())
+        let dayDurations = computeProjectDurations(
+            allEntries: allTodayProjects, firstOnTime: firstOnTime,
+            spanStart: dayStart, spanEnd: Date()
+        )
+        let breakTime = dayDurations.first(where: { $0.project == "Break" })?.duration ?? 0
+        let workedTime = max(0, screenTime - breakTime)
+        let totalItem = NSMenuItem(title: "Worked today: \(formatDuration(workedTime))", action: nil, keyEquivalent: "")
         totalItem.isEnabled = false
         menu.addItem(totalItem)
 
@@ -311,10 +324,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Time spans
         let spans = buildTimeSpans(from: todayScreenEvents)
-        let allTodayProjects = appData.projectEntries
-            .filter { Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~") }
-            .sorted { $0.time < $1.time }
-        let firstOnTime = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
 
         if spans.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
@@ -343,12 +352,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
 
-                if !durations.isEmpty {
+                let totalAttributed = durations.reduce(0.0) { $0 + $1.duration }
+                let diff = spanEnd.timeIntervalSince(span.start) - totalAttributed
+
+                if !durations.isEmpty || diff > 60 {
                     let submenu = NSMenu()
                     for pd in durations {
                         let pItem = NSMenuItem(title: "\(pd.project)  \(formatDuration(pd.duration))", action: nil, keyEquivalent: "")
                         pItem.isEnabled = false
                         submenu.addItem(pItem)
+                    }
+                    if diff > 60 {
+                        if !durations.isEmpty { submenu.addItem(.separator()) }
+                        let diffItem = NSMenuItem(title: "diff  \(formatDuration(diff))", action: nil, keyEquivalent: "")
+                        diffItem.isEnabled = false
+                        submenu.addItem(diffItem)
                     }
                     item.submenu = submenu
                 } else {
