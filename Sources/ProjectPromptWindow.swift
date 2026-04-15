@@ -2,11 +2,12 @@ import AppKit
 
 class ProjectPromptWindow: NSPanel {
     var onSave: ((String) -> Void)?
+    var onBreak: (() -> Void)?
     var onDismiss: (() -> Void)?
 
     private var comboBox: NSComboBox!
 
-    private static let W: CGFloat = 380
+    private static let W: CGFloat = 400
     private static let H: CGFloat = 58
 
     init(currentProject: String, recentProjects: [String]) {
@@ -56,7 +57,7 @@ class ProjectPromptWindow: NSPanel {
         label.frame = NSRect(x: 12, y: 38, width: 200, height: 12)
 
         // Combo box
-        comboBox = NSComboBox(frame: NSRect(x: 10, y: 10, width: 246, height: 26))
+        comboBox = NSComboBox(frame: NSRect(x: 10, y: 10, width: 200, height: 26))
         comboBox.placeholderString = "Project name…"
         comboBox.font = .systemFont(ofSize: 13)
         comboBox.isBordered = false
@@ -80,20 +81,28 @@ class ProjectPromptWindow: NSPanel {
         skipBtn.bezelStyle = .recessed
         skipBtn.controlSize = .small
         skipBtn.font = .systemFont(ofSize: 11)
-        skipBtn.frame = NSRect(x: 262, y: 14, width: 52, height: 18)
+        skipBtn.frame = NSRect(x: 216, y: 14, width: 52, height: 18)
         skipBtn.keyEquivalent = "\u{1b}"
+
+        // Break button
+        let breakBtn = NSButton(title: "Break", target: self, action: #selector(breakAction))
+        breakBtn.bezelStyle = .recessed
+        breakBtn.controlSize = .small
+        breakBtn.font = .systemFont(ofSize: 11)
+        breakBtn.frame = NSRect(x: 274, y: 14, width: 52, height: 18)
 
         // Save button
         let saveBtn = NSButton(title: "Save", target: self, action: #selector(saveAction))
         saveBtn.bezelStyle = .recessed
         saveBtn.controlSize = .small
         saveBtn.font = .systemFont(ofSize: 11)
-        saveBtn.frame = NSRect(x: 320, y: 14, width: 52, height: 18)
+        saveBtn.frame = NSRect(x: 332, y: 14, width: 52, height: 18)
         saveBtn.keyEquivalent = "\r"
 
         blur.addSubview(label)
         blur.addSubview(comboBox)
         blur.addSubview(skipBtn)
+        blur.addSubview(breakBtn)
         blur.addSubview(saveBtn)
         contentView = blur
     }
@@ -106,6 +115,11 @@ class ProjectPromptWindow: NSPanel {
     @objc private func saveAction() {
         let val = comboBox.stringValue.trimmingCharacters(in: .whitespaces)
         if !val.isEmpty { onSave?(val) }
+        dismiss()
+    }
+
+    @objc private func breakAction() {
+        onBreak?()
         dismiss()
     }
 

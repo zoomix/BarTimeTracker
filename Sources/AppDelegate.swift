@@ -351,6 +351,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.recordProjectEntry(val)
             }
 
+            window.onBreak = { [weak self] in
+                guard let self else { return }
+                self.recordProjectEntry("Break")
+            }
+
             window.onDismiss = { [weak self] in
                 guard let self else { return }
                 self.promptWindow = nil
