@@ -16,12 +16,28 @@ macOS menu bar app. Tracks screen activity and project work sessions. Always run
 - Prompts chain: next fires only after current is dismissed — no stacking after long absence
 - Window appears without stealing keyboard focus
 
+**Time spans**
+- Raw on/off events collapsed into continuous work spans (e.g. `9:00 AM – 12:30 PM  (3h 30m)`)
+- Gaps under 3 minutes merged (handles screen flicker / rapid lock-unlock)
+- Each span is hoverable — submenu shows projects worked during that span with duration
+- Duration attributed backwards: check-in at T claims `[prev check-in, T]` for its project
+- Most recent check-in also claims forward to span end (still working on it)
+- `diff  Xm` shown at bottom of submenu if span has unaccounted time
+
+**Break handling**
+- Popup → Break: marks the interval since last check-in as a break
+- Break time is subtracted from **Worked today** total
+- Deduction = only screen-on time overlapping the break claim (prevents over-subtraction when screen was already off during that period)
+- Break entries appear in span submenu so you can see where time went
+
+**End of day**
+- "Log out for the day" stops all prompts, records a logout marker
+- Persists across restarts — resets automatically next calendar day
+- "Resume tracking" re-enables prompts and restarts the timer
+
 **Menu shows**
-- Total active time today
-- First screen-on time today
-- All screen events with timestamps (▶ on / ■ off / ← left)
-  - `← left HH:MM` = computed time user left (screensaver start - timeout from system settings)
-  - Reads screensaver idle time from `com.apple.screensaver` ByHost prefs (`idleTime` or `lastDelayTime`)
+- Worked today (screen on-time minus breaks)
+- Work spans with per-project durations and diff markers
 - Current project
 - Last check (time ago) + next check (time until + clock time)
 - Interval selector submenu
@@ -46,7 +62,9 @@ Format:
   ],
   "projectEntries": [
     { "project": "ClientWork", "time": "2026-04-15T09:00:00Z" },
-    { "project": "ClientWork", "time": "2026-04-15T09:15:00Z" }
+    { "project": "ClientWork", "time": "2026-04-15T09:15:00Z" },
+    { "project": "Break",      "time": "2026-04-15T14:00:00Z" },
+    { "project": "~logged out~","time": "2026-04-15T17:30:00Z" }
   ]
 }
 ```
@@ -68,33 +86,38 @@ open BarTimeTracker.app
 ## Menu example
 
 ```
-Total on today: 7h 24m
-First on: 8:42 AM
+Worked today: 7h 24m
 ──────────────────
-▶ on    8:42 AM
-← left  10:40 AM     (screensaver started 11:00, timeout=20m)
-▶ on    11:05 AM
-■ off   6:00 PM
+8:42 AM – 11:00 AM  (2h 18m)  ▶   ClientWork  2h 18m
+11:05 AM – 6:00 PM  (6h 55m)  ▶   ClientWork  5h 10m
+                                   Break       45m
+                                   ───
+                                   diff        1h 0m
 ──────────────────
 Project: ClientWork
 Last check: 3 min ago
 Next check: in 12 min (2:47 PM)
-Check every… ▶  5 min
-                15 min ✓
-                30 min
-                60 min
+Set project…
+Check every… ▶
+──────────────────
+Log out for the day
 ──────────────────
 Quit
 ```
+
+Sentinel entries stored in JSON but never shown in menu: `~logged out~`, `~resumed~`.
 
 ## Usage
 
 | Action | Result |
 |--------|--------|
-| Click ⏱ icon | Open menu with today's events + project status |
+| Click ⏱ icon | Open menu with work spans + project status |
+| Hover span | See per-project durations + any diff |
 | Set project… | Create new project entry now |
 | Check every… | Set prompt interval (5 / 15 / 30 / 60 min) — persists across restarts |
-| Popup → Save | Create timestamped project entry |
+| Popup → Save | Log project; that interval attributed to it |
+| Popup → Break | Mark interval as break; excluded from worked total |
 | Popup → Skip | No entry, next prompt scheduled |
 | Popup → Esc | Same as Skip |
-| Click in popup | Focus window to type / use dropdown |
+| Log out for the day | Stop prompts for today; auto-resets next day |
+| Resume tracking | Re-enable prompts mid-day |
