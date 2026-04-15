@@ -1,2 +1,4 @@
 .claude/settings.local.json
 BarTimeTracker.app
+.claude/settings.json
+.claude/agents/entire-search.md
