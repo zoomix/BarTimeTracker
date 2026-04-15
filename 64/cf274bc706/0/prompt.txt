@@ -1,0 +1,12 @@
+Great. 
+
+Another thing. Can we position the popup so it's on top of everything, but make it as small as possible. Position it at the top of the main screen, centered.
+
+---
+
+Very good. The height is actually not that sensitive though. 
+
+Let's put in a dropdown of a hundred latest projects, sorted in reverse order of last used. 
+Let the window show up, but don't steal focus - if I'm typing a formula in to excel I don't want to look away and find I've written half the formula in the popup windows.
+
+Also, enable ctrl+a, ctrl+e, cmd+z etc
