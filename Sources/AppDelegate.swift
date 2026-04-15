@@ -24,6 +24,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var promptWindow: ProjectPromptWindow?
     var isFocusActive: Bool = false
     var lastPromptShown: Date?
+    var promptInterval: TimeInterval = 15 * 60
+
+    let intervalKey = "promptInterval"
+    let intervalOptions: [(label: String, seconds: TimeInterval)] = [
+        ("5 min",  5  * 60),
+        ("15 min", 15 * 60),
+        ("30 min", 30 * 60),
+        ("60 min", 60 * 60),
+    ]
 
     // MARK: - Storage
 
@@ -66,6 +75,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let data = loadData()
         currentProject = data.projectEntries.last?.project ?? ""
+
+        let saved = UserDefaults.standard.double(forKey: intervalKey)
+        if saved > 0 { promptInterval = saved }
 
         setupStatusItem()
         setupScreenMonitoring()
@@ -218,6 +230,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setItem.target = self
         menu.addItem(setItem)
 
+        // Interval submenu
+        let intervalItem = NSMenuItem(title: "Check every…", action: nil, keyEquivalent: "")
+        let submenu = NSMenu()
+        for option in intervalOptions {
+            let item = NSMenuItem(title: option.label, action: #selector(setInterval(_:)), keyEquivalent: "")
+            item.representedObject = option.seconds
+            item.state = option.seconds == promptInterval ? .on : .off
+            item.target = self
+            submenu.addItem(item)
+        }
+        intervalItem.submenu = submenu
+        menu.addItem(intervalItem)
+
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
@@ -230,7 +255,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func scheduleProjectTimer() {
         projectTimer?.invalidate()
-        projectTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: false) { [weak self] _ in
+        projectTimer = Timer.scheduledTimer(withTimeInterval: promptInterval, repeats: false) { [weak self] _ in
             guard let self else { return }
             let data = self.loadData()
             let screenIsOn = data.screenEvents.filter { Calendar.current.isDateInToday($0.time) }.last?.kind != .off
@@ -293,6 +318,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.lastPromptShown = Date()
             window.show()
         }
+    }
+
+    @objc func setInterval(_ sender: NSMenuItem) {
+        guard let interval = sender.representedObject as? TimeInterval else { return }
+        promptInterval = interval
+        UserDefaults.standard.set(interval, forKey: intervalKey)
+        scheduleProjectTimer()
     }
 
     func timeAgo(from date: Date) -> String {
