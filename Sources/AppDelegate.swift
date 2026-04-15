@@ -23,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var currentProject: String = ""
     var promptWindow: ProjectPromptWindow?
     var isFocusActive: Bool = false
+    var lastPromptShown: Date?
 
     // MARK: - Storage
 
@@ -202,6 +203,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         projItem.isEnabled = false
         menu.addItem(projItem)
 
+        // Last prompt time
+        let checkLabel: String
+        if let last = lastPromptShown {
+            checkLabel = "Last check: \(timeAgo(from: last))"
+        } else {
+            checkLabel = "Last check: not yet"
+        }
+        let checkItem = NSMenuItem(title: checkLabel, action: nil, keyEquivalent: "")
+        checkItem.isEnabled = false
+        menu.addItem(checkItem)
+
         let setItem = NSMenuItem(title: "Set project…", action: #selector(askForProjectManually), keyEquivalent: "p")
         setItem.target = self
         menu.addItem(setItem)
@@ -278,7 +290,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if isAutoPrompt { self.scheduleProjectTimer() }
             }
 
+            self.lastPromptShown = Date()
             window.show()
         }
+    }
+
+    func timeAgo(from date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60  { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60) min ago" }
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        return m > 0 ? "\(h)h \(m)m ago" : "\(h)h ago"
     }
 }
