@@ -218,6 +218,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return result
     }
 
+    /// For each project whose entry falls inside [spanStart, spanEnd], compute how much
+    /// time within that span is attributed to it.
+    ///
+    /// Attribution rule: entry[i] claims the interval [entry[i-1].time, entry[i].time]
+    /// (or [firstOnTime, entry[0].time] for the first entry of the day).
+    /// The last entry additionally claims [entry.last.time, spanEnd] (still working on it).
+    /// Each claim is intersected with [spanStart, spanEnd].
+    func computeProjectDurations(
+        allEntries: [ProjectEntry],
+        firstOnTime: Date?,
+        spanStart: Date,
+        spanEnd: Date
+    ) -> [(project: String, duration: TimeInterval)] {
+        guard !allEntries.isEmpty else { return [] }
+
+        let dayStart = firstOnTime ?? allEntries[0].time
+        var durations: [String: TimeInterval] = [:]
+
+        for i in 0..<allEntries.count {
+            let entry = allEntries[i]
+            let claimStart = i == 0 ? dayStart : allEntries[i - 1].time
+            let intStart = max(claimStart, spanStart)
+            let intEnd   = min(entry.time, spanEnd)
+            if intEnd > intStart {
+                durations[entry.project, default: 0] += intEnd.timeIntervalSince(intStart)
+            }
+        }
+
+        // Last entry also claims forwards to spanEnd
+        if let last = allEntries.last {
+            let intStart = max(last.time, spanStart)
+            if spanEnd > intStart {
+                durations[last.project, default: 0] += spanEnd.timeIntervalSince(intStart)
+            }
+        }
+
+        return durations
+            .map { (project: $0.key, duration: $0.value) }
+            .filter { $0.duration >= 30 }
+            .sorted { $0.duration > $1.duration }
+    }
+
     func formatDuration(_ interval: TimeInterval) -> String {
         let h = Int(interval) / 3600
         let m = (Int(interval) % 3600) / 60
@@ -269,9 +311,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Time spans
         let spans = buildTimeSpans(from: todayScreenEvents)
-        let todayProjects = appData.projectEntries.filter {
-            Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~")
-        }
+        let allTodayProjects = appData.projectEntries
+            .filter { Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~") }
+            .sorted { $0.time < $1.time }
+        let firstOnTime = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
 
         if spans.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
@@ -285,16 +328,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let title    = "\(startStr) – \(endStr)  (\(dur))"
 
                 let spanEnd = span.end ?? Date()
-                let projects = todayProjects.filter { $0.time >= span.start && $0.time <= spanEnd }
+
+                // Projects reported within this span
+                let reportedInSpan = Set(allTodayProjects
+                    .filter { $0.time >= span.start && $0.time <= spanEnd }
+                    .map { $0.project })
+
+                let durations = computeProjectDurations(
+                    allEntries: allTodayProjects,
+                    firstOnTime: firstOnTime,
+                    spanStart: span.start,
+                    spanEnd: spanEnd
+                ).filter { reportedInSpan.contains($0.project) }
 
                 let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
 
-                if !projects.isEmpty {
+                if !durations.isEmpty {
                     let submenu = NSMenu()
-                    var seen = Set<String>()
-                    for entry in projects {
-                        guard seen.insert(entry.project).inserted else { continue }
-                        let pItem = NSMenuItem(title: entry.project, action: nil, keyEquivalent: "")
+                    for pd in durations {
+                        let pItem = NSMenuItem(title: "\(pd.project)  \(formatDuration(pd.duration))", action: nil, keyEquivalent: "")
                         pItem.isEnabled = false
                         submenu.addItem(pItem)
                     }
