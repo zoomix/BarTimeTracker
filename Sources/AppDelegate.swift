@@ -24,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var promptWindow: ProjectPromptWindow?
     var isFocusActive: Bool = false
     var lastPromptShown: Date?
+    var nextPromptDate: Date?
     var promptInterval: TimeInterval = 15 * 60
 
     let intervalKey = "promptInterval"
@@ -215,16 +216,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         projItem.isEnabled = false
         menu.addItem(projItem)
 
-        // Last prompt time
-        let checkLabel: String
-        if let last = lastPromptShown {
-            checkLabel = "Last check: \(timeAgo(from: last))"
-        } else {
-            checkLabel = "Last check: not yet"
-        }
-        let checkItem = NSMenuItem(title: checkLabel, action: nil, keyEquivalent: "")
-        checkItem.isEnabled = false
-        menu.addItem(checkItem)
+        // Last / next prompt times
+        let lastLabel = lastPromptShown.map { "Last check: \(timeAgo(from: $0))" } ?? "Last check: not yet"
+        let lastItem = NSMenuItem(title: lastLabel, action: nil, keyEquivalent: "")
+        lastItem.isEnabled = false
+        menu.addItem(lastItem)
+
+        let nextLabel = nextPromptDate.map { "Next check: \(timeUntil($0))" } ?? "Next check: —"
+        let nextItem = NSMenuItem(title: nextLabel, action: nil, keyEquivalent: "")
+        nextItem.isEnabled = false
+        menu.addItem(nextItem)
 
         let setItem = NSMenuItem(title: "Set project…", action: #selector(askForProjectManually), keyEquivalent: "p")
         setItem.target = self
@@ -255,6 +256,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func scheduleProjectTimer() {
         projectTimer?.invalidate()
+        nextPromptDate = Date().addingTimeInterval(promptInterval)
         projectTimer = Timer.scheduledTimer(withTimeInterval: promptInterval, repeats: false) { [weak self] _ in
             guard let self else { return }
             let data = self.loadData()
@@ -329,10 +331,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func timeAgo(from date: Date) -> String {
         let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60  { return "just now" }
+        if seconds < 60   { return "just now" }
         if seconds < 3600 { return "\(seconds / 60) min ago" }
         let h = seconds / 3600
         let m = (seconds % 3600) / 60
         return m > 0 ? "\(h)h \(m)m ago" : "\(h)h ago"
+    }
+
+    func timeUntil(_ date: Date) -> String {
+        let seconds = Int(date.timeIntervalSinceNow)
+        guard seconds > 0 else { return "soon" }
+        let timeFmt = DateFormatter()
+        timeFmt.timeStyle = .short
+        timeFmt.dateStyle = .none
+        let clock = timeFmt.string(from: date)
+        if seconds < 60   { return "in \(seconds)s (\(clock))" }
+        if seconds < 3600 { return "in \(seconds / 60) min (\(clock))" }
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        let dur = m > 0 ? "\(h)h \(m)m" : "\(h)h"
+        return "in \(dur) (\(clock))"
     }
 }
