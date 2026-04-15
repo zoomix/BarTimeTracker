@@ -260,6 +260,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sorted { $0.duration > $1.duration }
     }
 
+    /// Same pairing logic as totalOnTime — must stay in sync.
+    func screenOnIntervals(from events: [ScreenEvent]) -> [(start: Date, end: Date)] {
+        var intervals: [(start: Date, end: Date)] = []
+        var lastOn: Date?
+        for event in events {
+            if event.kind == .on || event.kind == .screensaverOff {
+                lastOn = event.time
+            } else if event.kind.isAway, let on = lastOn {
+                intervals.append((on, event.time))
+                lastOn = nil
+            }
+        }
+        if let on = lastOn { intervals.append((on, Date())) }
+        return intervals
+    }
+
+    /// Break time = only the screen-ON portion of break claim intervals.
+    /// Prevents over-subtracting when screen was already off during the break period.
+    func effectiveBreakTime(allEntries: [ProjectEntry], firstOnTime: Date?,
+                            onIntervals: [(start: Date, end: Date)]) -> TimeInterval {
+        guard !allEntries.isEmpty else { return 0 }
+        let dayStart = firstOnTime ?? allEntries[0].time
+
+        func intersect(_ claimStart: Date, _ claimEnd: Date) -> TimeInterval {
+            onIntervals.reduce(0) { sum, iv in
+                let s = max(claimStart, iv.start), e = min(claimEnd, iv.end)
+                return e > s ? sum + e.timeIntervalSince(s) : sum
+            }
+        }
+
+        var total: TimeInterval = 0
+        for i in 0..<allEntries.count {
+            guard allEntries[i].project == "Break" else { continue }
+            let claimStart = i == 0 ? dayStart : allEntries[i - 1].time
+            total += intersect(claimStart, allEntries[i].time)
+        }
+        if allEntries.last?.project == "Break" {
+            total += intersect(allEntries.last!.time, Date())
+        }
+        return total
+    }
+
     func formatDuration(_ interval: TimeInterval) -> String {
         let h = Int(interval) / 3600
         let m = (Int(interval) % 3600) / 60
@@ -307,14 +349,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sorted { $0.time < $1.time }
         let firstOnTime = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
 
-        // Total worked = screen on-time minus break intervals
+        // Total worked = screen on-time minus break screen-on overlap only
         let screenTime = totalOnTime(events: todayScreenEvents)
-        let dayStart = firstOnTime ?? Calendar.current.startOfDay(for: Date())
-        let dayDurations = computeProjectDurations(
-            allEntries: allTodayProjects, firstOnTime: firstOnTime,
-            spanStart: dayStart, spanEnd: Date()
-        )
-        let breakTime = dayDurations.first(where: { $0.project == "Break" })?.duration ?? 0
+        let onIntervals = screenOnIntervals(from: todayScreenEvents)
+        let breakTime = effectiveBreakTime(allEntries: allTodayProjects, firstOnTime: firstOnTime, onIntervals: onIntervals)
         let workedTime = max(0, screenTime - breakTime)
         let totalItem = NSMenuItem(title: "Worked today: \(formatDuration(workedTime))", action: nil, keyEquivalent: "")
         totalItem.isEnabled = false
