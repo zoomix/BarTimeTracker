@@ -172,6 +172,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return total
     }
 
+    struct TimeSpan {
+        let start: Date
+        let end: Date?   // nil = still active
+        let isActive: Bool
+    }
+
+    func buildTimeSpans(from events: [ScreenEvent], mergeThreshold: TimeInterval = 3 * 60) -> [TimeSpan] {
+        // Build raw completed spans
+        var rawSpans: [(start: Date, end: Date)] = []
+        var spanStart: Date? = nil
+
+        for event in events {
+            switch event.kind {
+            case .on, .screensaverOff:
+                if spanStart == nil { spanStart = event.time }
+            case .off, .screensaverOn:
+                if let s = spanStart {
+                    rawSpans.append((start: s, end: event.time))
+                    spanStart = nil
+                }
+            }
+        }
+        let activeStart = spanStart  // non-nil if screen still on
+
+        // Merge completed spans whose gap is < threshold
+        var merged: [(start: Date, end: Date)] = []
+        for span in rawSpans {
+            if let last = merged.last, span.start.timeIntervalSince(last.end) < mergeThreshold {
+                merged[merged.count - 1] = (start: last.start, end: span.end)
+            } else {
+                merged.append(span)
+            }
+        }
+
+        // Attach or append active span
+        var result = merged.map { TimeSpan(start: $0.start, end: $0.end, isActive: false) }
+        if let active = activeStart {
+            if let last = merged.last, active.timeIntervalSince(last.end) < mergeThreshold {
+                result[result.count - 1] = TimeSpan(start: last.start, end: nil, isActive: true)
+            } else {
+                result.append(TimeSpan(start: active, end: nil, isActive: true))
+            }
+        }
+        return result
+    }
+
     func formatDuration(_ interval: TimeInterval) -> String {
         let h = Int(interval) / 3600
         let m = (Int(interval) % 3600) / 60
@@ -219,38 +265,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         totalItem.isEnabled = false
         menu.addItem(totalItem)
 
-        if let first = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff }) {
-            let item = NSMenuItem(title: "First on: \(timeFmt.string(from: first.time))", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        }
-
         menu.addItem(NSMenuItem.separator())
 
-        // Screen events
-        if todayScreenEvents.isEmpty {
+        // Time spans
+        let spans = buildTimeSpans(from: todayScreenEvents)
+        let todayProjects = appData.projectEntries.filter {
+            Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~")
+        }
+
+        if spans.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            let timeout = screensaverTimeout()
-            for event in todayScreenEvents {
-                let label: String?
-                switch event.kind {
-                case .on:
-                    label = "▶ on    \(timeFmt.string(from: event.time))"
-                case .off:
-                    label = "■ off   \(timeFmt.string(from: event.time))"
-                case .screensaverOn:
-                    let leftTime = event.time.addingTimeInterval(-timeout)
-                    let mark = timeout > 0 ? "" : "~"
-                    label = "← left  \(mark)\(timeFmt.string(from: leftTime))"
-                case .screensaverOff:
-                    label = nil  // covered by next on event
+            for span in spans {
+                let startStr = timeFmt.string(from: span.start)
+                let endStr   = span.isActive ? "now" : timeFmt.string(from: span.end!)
+                let dur      = formatDuration((span.end ?? Date()).timeIntervalSince(span.start))
+                let title    = "\(startStr) – \(endStr)  (\(dur))"
+
+                let spanEnd = span.end ?? Date()
+                let projects = todayProjects.filter { $0.time >= span.start && $0.time <= spanEnd }
+
+                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+
+                if !projects.isEmpty {
+                    let submenu = NSMenu()
+                    var seen = Set<String>()
+                    for entry in projects {
+                        guard seen.insert(entry.project).inserted else { continue }
+                        let pItem = NSMenuItem(title: entry.project, action: nil, keyEquivalent: "")
+                        pItem.isEnabled = false
+                        submenu.addItem(pItem)
+                    }
+                    item.submenu = submenu
+                } else {
+                    item.isEnabled = false
                 }
-                guard let label else { continue }
-                let item = NSMenuItem(title: label, action: nil, keyEquivalent: "")
-                item.isEnabled = false
                 menu.addItem(item)
             }
         }
