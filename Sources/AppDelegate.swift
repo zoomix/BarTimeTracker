@@ -116,7 +116,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         name: .init("com.apple.screensaver.didstop"), object: nil)
     }
 
-    @objc func screenWoke()        { recordScreenEvent(.on) }
+    @objc func screenWoke() {
+        recordScreenEvent(.on)
+        // Restart timer if not running — covers new day after logout (isLoggedOut resets automatically)
+        if projectTimer == nil { scheduleProjectTimer() }
+    }
     @objc func screenSlept()       { recordScreenEvent(.off) }
     @objc func screensaverStarted(){ recordScreenEvent(.screensaverOn) }
     @objc func screensaverStopped(){ recordScreenEvent(.screensaverOff) }
