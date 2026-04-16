@@ -112,6 +112,14 @@ class ProjectPromptWindow: NSPanel {
         orderFront(nil)
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+           event.charactersIgnoringModifiers == "a" {
+            return NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self)
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     @objc private func saveAction() {
         let val = comboBox.stringValue.trimmingCharacters(in: .whitespaces)
         if !val.isEmpty { onSave?(val) }
