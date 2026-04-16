@@ -32,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var lastPromptShown: Date?
     var nextPromptDate: Date?
     var promptInterval: TimeInterval = 15 * 60
+    var screensaverStartTime: Date?
 
     let intervalKey = "promptInterval"
     let logoutDateKey = "logoutDate"
@@ -122,8 +123,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if projectTimer == nil { scheduleProjectTimer() }
     }
     @objc func screenSlept()       { recordScreenEvent(.off) }
-    @objc func screensaverStarted(){ recordScreenEvent(.screensaverOn) }
-    @objc func screensaverStopped(){ recordScreenEvent(.screensaverOff) }
+    @objc func screensaverStarted() {
+        screensaverStartTime = Date()
+        recordScreenEvent(.screensaverOn)
+    }
+    @objc func screensaverStopped() {
+        recordScreenEvent(.screensaverOff)
+        if let start = screensaverStartTime {
+            let absence = Date().timeIntervalSince(start)
+            screensaverStartTime = nil
+            if absence > 60 { askForProject(isAutoPrompt: true) }
+        }
+    }
 
     func recordScreenEvent(_ kind: ScreenEvent.Kind) {
         var data = loadData()
@@ -182,7 +193,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let isActive: Bool
     }
 
-    func buildTimeSpans(from events: [ScreenEvent], mergeThreshold: TimeInterval = 3 * 60) -> [TimeSpan] {
+    func buildTimeSpans(from events: [ScreenEvent],
+                        projectEntries: [ProjectEntry] = [],
+                        mergeThreshold: TimeInterval = 3 * 60) -> [TimeSpan] {
         // Build raw completed spans
         var rawSpans: [(start: Date, end: Date)] = []
         var spanStart: Date? = nil
@@ -200,21 +213,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let activeStart = spanStart  // non-nil if screen still on
 
-        // Merge completed spans whose gap is < threshold
+        // Gap covered by a project (not Break) = spans should be merged regardless of duration.
+        // The first entry at or after gapEnd tells us what the user was doing during the gap.
+        func gapCoveredByWork(gapEnd: Date) -> Bool {
+            guard let first = projectEntries.first(where: { $0.time >= gapEnd }) else { return false }
+            return first.project != "Break"
+        }
+
+        // Merge completed spans whose gap is < threshold OR covered by non-Break project
         var merged: [(start: Date, end: Date)] = []
         for span in rawSpans {
-            if let last = merged.last, span.start.timeIntervalSince(last.end) < mergeThreshold {
-                merged[merged.count - 1] = (start: last.start, end: span.end)
-            } else {
-                merged.append(span)
+            if let last = merged.last {
+                let gap = span.start.timeIntervalSince(last.end)
+                if gap < mergeThreshold || gapCoveredByWork(gapEnd: span.start) {
+                    merged[merged.count - 1] = (start: last.start, end: span.end)
+                    continue
+                }
             }
+            merged.append(span)
         }
 
         // Attach or append active span
         var result = merged.map { TimeSpan(start: $0.start, end: $0.end, isActive: false) }
         if let active = activeStart {
-            if let last = merged.last, active.timeIntervalSince(last.end) < mergeThreshold {
-                result[result.count - 1] = TimeSpan(start: last.start, end: nil, isActive: true)
+            if let last = merged.last {
+                let gap = active.timeIntervalSince(last.end)
+                if gap < mergeThreshold || gapCoveredByWork(gapEnd: active) {
+                    result[result.count - 1] = TimeSpan(start: last.start, end: nil, isActive: true)
+                } else {
+                    result.append(TimeSpan(start: active, end: nil, isActive: true))
+                }
             } else {
                 result.append(TimeSpan(start: active, end: nil, isActive: true))
             }
@@ -448,7 +476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(totalItem)
         menu.addItem(.separator())
 
-        let spans = buildTimeSpans(from: dayScreenEvents)
+        let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
         if spans.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
             item.isEnabled = false
