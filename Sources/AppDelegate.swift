@@ -340,83 +340,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showMenu() {
         let appData = loadData()
-        let todayScreenEvents = appData.screenEvents.filter { Calendar.current.isDateInToday($0.time) }
-
         let menu = NSMenu()
         let timeFmt = DateFormatter()
         timeFmt.timeStyle = .short
         timeFmt.dateStyle = .none
 
-        // Project entries and first-on anchor (needed for break calc + span durations)
-        let allTodayProjects = appData.projectEntries
-            .filter { Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~") }
-            .sorted { $0.time < $1.time }
-        let firstOnTime = todayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
-
-        // Total worked = screen on-time minus break screen-on overlap only
-        let screenTime = totalOnTime(events: todayScreenEvents)
-        let onIntervals = screenOnIntervals(from: todayScreenEvents)
-        let breakTime = effectiveBreakTime(allEntries: allTodayProjects, firstOnTime: firstOnTime, onIntervals: onIntervals)
-        let workedTime = max(0, screenTime - breakTime)
-        let totalItem = NSMenuItem(title: "Worked today: \(formatDuration(workedTime))", action: nil, keyEquivalent: "")
-        totalItem.isEnabled = false
-        menu.addItem(totalItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        // Time spans
-        let spans = buildTimeSpans(from: todayScreenEvents)
-
-        if spans.isEmpty {
-            let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        } else {
-            for span in spans {
-                let startStr = timeFmt.string(from: span.start)
-                let endStr   = span.isActive ? "now" : timeFmt.string(from: span.end!)
-                let dur      = formatDuration((span.end ?? Date()).timeIntervalSince(span.start))
-                let title    = "\(startStr) – \(endStr)  (\(dur))"
-
-                let spanEnd = span.end ?? Date()
-
-                // Projects reported within this span
-                let reportedInSpan = Set(allTodayProjects
-                    .filter { $0.time >= span.start && $0.time <= spanEnd }
-                    .map { $0.project })
-
-                let durations = computeProjectDurations(
-                    allEntries: allTodayProjects,
-                    firstOnTime: firstOnTime,
-                    spanStart: span.start,
-                    spanEnd: spanEnd
-                ).filter { reportedInSpan.contains($0.project) }
-
-                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-
-                let totalAttributed = durations.reduce(0.0) { $0 + $1.duration }
-                let diff = spanEnd.timeIntervalSince(span.start) - totalAttributed
-
-                if !durations.isEmpty || diff > 60 {
-                    let submenu = NSMenu()
-                    for pd in durations {
-                        let pItem = NSMenuItem(title: "\(pd.project)  \(formatDuration(pd.duration))", action: nil, keyEquivalent: "")
-                        pItem.isEnabled = false
-                        submenu.addItem(pItem)
-                    }
-                    if diff > 60 {
-                        if !durations.isEmpty { submenu.addItem(.separator()) }
-                        let diffItem = NSMenuItem(title: "diff  \(formatDuration(diff))", action: nil, keyEquivalent: "")
-                        diffItem.isEnabled = false
-                        submenu.addItem(diffItem)
-                    }
-                    item.submenu = submenu
-                } else {
-                    item.isEnabled = false
-                }
-                menu.addItem(item)
-            }
-        }
+        // Today
+        addDayItems(to: menu, date: Date(), appData: appData, timeFmt: timeFmt)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -448,16 +378,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Interval submenu
         let intervalItem = NSMenuItem(title: "Check every…", action: nil, keyEquivalent: "")
-        let submenu = NSMenu()
+        let intervalSubmenu = NSMenu()
         for option in intervalOptions {
             let item = NSMenuItem(title: option.label, action: #selector(setInterval(_:)), keyEquivalent: "")
             item.representedObject = option.seconds
             item.state = option.seconds == promptInterval ? .on : .off
             item.target = self
-            submenu.addItem(item)
+            intervalSubmenu.addItem(item)
         }
-        intervalItem.submenu = submenu
+        intervalItem.submenu = intervalSubmenu
         menu.addItem(intervalItem)
+
+        // Previous days submenu
+        let cal = Calendar.current
+        let isoFmt = DateFormatter()
+        isoFmt.dateFormat = "yyyy-MM-dd"
+        let allDates = appData.screenEvents.map(\.time) + appData.projectEntries.map(\.time)
+        let prevDays = Array(Set(allDates
+            .filter { !cal.isDateInToday($0) }
+            .map { cal.startOfDay(for: $0) }))
+            .sorted(by: >)
+        if !prevDays.isEmpty {
+            let prevItem = NSMenuItem(title: "Previous days", action: nil, keyEquivalent: "")
+            let prevSubmenu = NSMenu()
+            for day in prevDays {
+                let dayItem = NSMenuItem(title: isoFmt.string(from: day), action: nil, keyEquivalent: "")
+                let dayMenu = NSMenu()
+                addDayItems(to: dayMenu, date: day, appData: appData, timeFmt: timeFmt)
+                dayItem.submenu = dayMenu
+                prevSubmenu.addItem(dayItem)
+            }
+            prevItem.submenu = prevSubmenu
+            menu.addItem(prevItem)
+        }
 
         menu.addItem(NSMenuItem.separator())
         if isLoggedOut {
@@ -475,6 +428,74 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    func addDayItems(to menu: NSMenu, date: Date, appData: AppData, timeFmt: DateFormatter) {
+        let cal = Calendar.current
+        let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: date) }
+        let dayProjects = appData.projectEntries
+            .filter { cal.isDate($0.time, inSameDayAs: date) && !$0.project.hasPrefix("~") }
+            .sorted { $0.time < $1.time }
+        let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+
+        let screenTime = totalOnTime(events: dayScreenEvents)
+        let onIntervals = screenOnIntervals(from: dayScreenEvents)
+        let breakTime = effectiveBreakTime(allEntries: dayProjects, firstOnTime: firstOnTime, onIntervals: onIntervals)
+        let workedTime = max(0, screenTime - breakTime)
+
+        let totalItem = NSMenuItem(title: "Worked: \(formatDuration(workedTime))", action: nil, keyEquivalent: "")
+        totalItem.isEnabled = false
+        menu.addItem(totalItem)
+        menu.addItem(.separator())
+
+        let spans = buildTimeSpans(from: dayScreenEvents)
+        if spans.isEmpty {
+            let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        } else {
+            for span in spans {
+                let spanEnd = span.end ?? Date()
+                let startStr = timeFmt.string(from: span.start)
+                let endStr   = span.isActive ? "now" : timeFmt.string(from: span.end!)
+                let dur      = formatDuration(spanEnd.timeIntervalSince(span.start))
+                let title    = "\(startStr) – \(endStr)  (\(dur))"
+
+                let reportedInSpan = Set(dayProjects
+                    .filter { $0.time >= span.start && $0.time <= spanEnd }
+                    .map { $0.project })
+
+                let durations = computeProjectDurations(
+                    allEntries: dayProjects,
+                    firstOnTime: firstOnTime,
+                    spanStart: span.start,
+                    spanEnd: spanEnd
+                ).filter { reportedInSpan.contains($0.project) }
+
+                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                let totalAttributed = durations.reduce(0.0) { $0 + $1.duration }
+                let diff = spanEnd.timeIntervalSince(span.start) - totalAttributed
+
+                if !durations.isEmpty || diff > 60 {
+                    let submenu = NSMenu()
+                    for pd in durations {
+                        let pItem = NSMenuItem(title: "\(pd.project)  \(formatDuration(pd.duration))", action: nil, keyEquivalent: "")
+                        pItem.isEnabled = false
+                        submenu.addItem(pItem)
+                    }
+                    if diff > 60 {
+                        if !durations.isEmpty { submenu.addItem(.separator()) }
+                        let diffItem = NSMenuItem(title: "diff  \(formatDuration(diff))", action: nil, keyEquivalent: "")
+                        diffItem.isEnabled = false
+                        submenu.addItem(diffItem)
+                    }
+                    item.submenu = submenu
+                } else {
+                    item.isEnabled = false
+                }
+                menu.addItem(item)
+            }
+        }
     }
 
     // MARK: - Project Timer
