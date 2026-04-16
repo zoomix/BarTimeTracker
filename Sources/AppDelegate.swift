@@ -177,7 +177,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         for event in events {
             if event.kind == .on || event.kind == .screensaverOff {
-                lastOn = event.time
+                if lastOn == nil { lastOn = event.time }  // don't overwrite — keep earliest start
             } else if event.kind.isAway, let on = lastOn {
                 total += event.time.timeIntervalSince(on)
                 lastOn = nil
@@ -185,6 +185,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let on = lastOn { total += Date().timeIntervalSince(on) }
         return total
+    }
+
+    /// Worked time = sum of span durations minus break-attributed time within each span.
+    /// This counts project-attributed offline time (meetings etc.) as worked, unlike raw screen-on time.
+    func workedTime(spans: [TimeSpan], allEntries: [ProjectEntry], firstOnTime: Date?) -> TimeInterval {
+        spans.reduce(0.0) { total, span in
+            let spanEnd = span.end ?? Date()
+            let spanDur = spanEnd.timeIntervalSince(span.start)
+            let d = computeProjectDurations(allEntries: allEntries, firstOnTime: firstOnTime,
+                                            spanStart: span.start, spanEnd: spanEnd)
+            let breakDur = d.first(where: { $0.project == "Break" })?.duration ?? 0
+            return total + max(0, spanDur - breakDur)
+        }
     }
 
     struct TimeSpan {
@@ -466,17 +479,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sorted { $0.time < $1.time }
         let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
 
-        let screenTime = totalOnTime(events: dayScreenEvents)
-        let onIntervals = screenOnIntervals(from: dayScreenEvents)
-        let breakTime = effectiveBreakTime(allEntries: dayProjects, firstOnTime: firstOnTime, onIntervals: onIntervals)
-        let workedTime = max(0, screenTime - breakTime)
+        let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
+        let worked = workedTime(spans: spans, allEntries: dayProjects, firstOnTime: firstOnTime)
 
-        let totalItem = NSMenuItem(title: "Worked: \(formatDuration(workedTime))", action: nil, keyEquivalent: "")
+        let totalItem = NSMenuItem(title: "Worked: \(formatDuration(worked))", action: nil, keyEquivalent: "")
         totalItem.isEnabled = false
         menu.addItem(totalItem)
         menu.addItem(.separator())
-
-        let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
         if spans.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
             item.isEnabled = false
