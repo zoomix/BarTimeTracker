@@ -119,10 +119,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func screenWoke() {
         recordScreenEvent(.on)
-        // Restart timer if not running — covers new day after logout (isLoggedOut resets automatically)
         if projectTimer == nil { scheduleProjectTimer() }
+        // Prompt on lid-open return if absent long enough (screensaver path handles its own)
+        let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
+        if sinceLastPrompt > promptInterval { askForProject(isAutoPrompt: true) }
     }
-    @objc func screenSlept()       { recordScreenEvent(.off) }
+    @objc func screenSlept() {
+        screensaverStartTime = nil  // lid-close voids any pending screensaver absence
+        recordScreenEvent(.off)
+    }
     @objc func screensaverStarted() {
         screensaverStartTime = Date()
         recordScreenEvent(.screensaverOn)
@@ -167,6 +172,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var data = loadData()
         data.projectEntries.append(ProjectEntry(project: project, time: Date()))
         saveData(data)
+        scheduleProjectTimer()
     }
 
     // MARK: - Time Calculation
@@ -596,8 +602,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
-            // Don't stack prompts
-            guard self.promptWindow == nil else { return }
+            // Don't stack prompts — but ensure timer survives
+            guard self.promptWindow == nil else {
+                if isAutoPrompt { self.scheduleProjectTimer() }
+                return
+            }
 
             let window = ProjectPromptWindow(
                 currentProject: self.currentProject,
