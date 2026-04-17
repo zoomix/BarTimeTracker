@@ -27,6 +27,7 @@ class ProjectPromptWindow: NSPanel {
         )
 
         level = .floating
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
