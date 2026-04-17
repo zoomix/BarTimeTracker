@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import IOKit.pwr_mgt
 
 struct ScreenEvent: Codable {
     enum Kind: String, Codable {
@@ -152,10 +153,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Focus Monitoring
 
     func setupFocusMonitoring() {
-        // Read current state (works for DND and Focus modes on macOS 12+)
-        isFocusActive = UserDefaults(suiteName: "com.apple.notificationcenterui")?
-            .bool(forKey: "doNotDisturb") ?? false
-
+        // Legacy DND (macOS ≤11 only — no longer fires on 12+)
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(self, selector: #selector(focusDidStart),
                         name: .init("com.apple.notificationcenterui.dndstart"), object: nil)
@@ -165,6 +163,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func focusDidStart() { isFocusActive = true }
     @objc func focusDidEnd()   { isFocusActive = false }
+
+    // Returns true when Keynote/Zoom/Teams/etc. is holding a display-sleep prevention
+    // assertion — the reliable cross-version signal that a presentation is in progress.
+    func isPresentationActive() -> Bool {
+        var byProcess: Unmanaged<CFDictionary>?
+        guard IOPMCopyAssertionsByProcess(&byProcess) == kIOReturnSuccess,
+              let dict = byProcess?.takeRetainedValue() as? [String: [[String: Any]]] else {
+            return false
+        }
+        return dict.values.contains { assertions in
+            assertions.contains { ($0["AssertType"] as? String) == "PreventUserIdleDisplaySleep" }
+        }
+    }
 
     // MARK: - Project Entries
 
@@ -600,8 +611,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func askForProject(isAutoPrompt: Bool) {
         DispatchQueue.main.async {
-            // Skip if Focus/DND is active — reschedule and try again later
-            if isAutoPrompt && self.isFocusActive {
+            // Skip if Focus/DND or a presentation is active — reschedule and try again later
+            if isAutoPrompt && (self.isFocusActive || self.isPresentationActive()) {
                 self.scheduleProjectTimer()
                 return
             }
