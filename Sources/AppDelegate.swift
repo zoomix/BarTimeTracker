@@ -459,6 +459,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(prevItem)
         }
 
+        let exportItem = NSMenuItem(title: "Export CSV…", action: #selector(exportCSV), keyEquivalent: "")
+        exportItem.target = self
+        menu.addItem(exportItem)
+
         menu.addItem(NSMenuItem.separator())
         if isLoggedOut {
             let item = NSMenuItem(title: "Resume tracking", action: #selector(resumeTracking), keyEquivalent: "")
@@ -665,5 +669,117 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let m = (seconds % 3600) / 60
         let dur = m > 0 ? "\(h)h \(m)m" : "\(h)h"
         return "in \(dur) (\(clock))"
+    }
+
+    // MARK: - CSV Export
+
+    @objc func exportCSV() {
+        let csv = buildCSV()
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.commaSeparatedText]
+            panel.nameFieldStringValue = "BarTimeTracker_export.csv"
+            panel.begin { response in
+                guard response == .OK, let url = panel.url else { return }
+                try? csv.write(to: url, atomically: true, encoding: .utf8)
+            }
+        }
+    }
+
+    func buildCSV() -> String {
+        let appData = loadData()
+        let cal = Calendar.current
+        let dateFmt = DateFormatter()
+        dateFmt.dateFormat = "yyyy-MM-dd"
+        let timeFmt = DateFormatter()
+        timeFmt.dateFormat = "HH:mm"
+
+        func csvField(_ s: String) -> String {
+            s.contains(";") || s.contains("\"") || s.contains("\n")
+                ? "\"\(s.replacingOccurrences(of: "\"", with: "\"\""))\"" : s
+        }
+
+        struct RawRow {
+            let date: String
+            var start: Date
+            var end: Date
+            let project: String
+        }
+
+        var rows: [RawRow] = []
+
+        let allDates = (appData.screenEvents.map(\.time) + appData.projectEntries.map(\.time))
+            .map { cal.startOfDay(for: $0) }
+        let days = Array(Set(allDates)).sorted()
+
+        for day in days {
+            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
+            let dayProjects = appData.projectEntries
+                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
+                .sorted { $0.time < $1.time }
+            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+            let dayStart = firstOnTime ?? day
+            let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
+            let dateStr = dateFmt.string(from: day)
+
+            func addRow(_ start: Date, _ end: Date, _ project: String) {
+                guard end > start, Int(end.timeIntervalSince(start) / 60) > 0 else { return }
+                rows.append(RawRow(date: dateStr, start: start, end: end, project: project))
+            }
+
+            for span in spans {
+                let spanEnd = span.end ?? Date()
+                let indicesInSpan = dayProjects.indices.filter {
+                    dayProjects[$0].time > span.start && dayProjects[$0].time <= spanEnd
+                }
+
+                if indicesInSpan.isEmpty {
+                    addRow(span.start, spanEnd, "")
+                    continue
+                }
+
+                var coveredUpTo = span.start
+
+                for idx in indicesInSpan {
+                    let entry = dayProjects[idx]
+                    let claimFrom = idx == 0 ? dayStart : dayProjects[idx - 1].time
+                    let rowStart = max(claimFrom, span.start)
+                    let rowEnd = entry.time
+
+                    if rowStart > coveredUpTo { addRow(coveredUpTo, rowStart, "") }
+                    if entry.project != "Break" { addRow(rowStart, rowEnd, entry.project) }
+                    coveredUpTo = rowEnd
+                }
+
+                if let lastIdx = indicesInSpan.last {
+                    let lastEntry = dayProjects[lastIdx]
+                    let rowStart = max(lastEntry.time, span.start)
+                    if rowStart > coveredUpTo { addRow(coveredUpTo, rowStart, "") }
+                    if lastEntry.project != "Break" { addRow(rowStart, spanEnd, lastEntry.project) }
+                }
+            }
+        }
+
+        // Merge consecutive rows with the same date and project
+        var merged: [RawRow] = []
+        for row in rows {
+            if var last = merged.last,
+               last.date == row.date,
+               last.project == row.project,
+               last.end == row.start {
+                last.end = row.end
+                merged[merged.count - 1] = last
+            } else {
+                merged.append(row)
+            }
+        }
+
+        var lines = ["Date;Start time;End time;Duration (minutes);Project/Description"]
+        for row in merged {
+            let durMin = Int(row.end.timeIntervalSince(row.start) / 60)
+            lines.append("\(row.date);\(timeFmt.string(from: row.start));\(timeFmt.string(from: row.end));\(durMin);\(csvField(row.project))")
+        }
+        return lines.joined(separator: "\n")
     }
 }
