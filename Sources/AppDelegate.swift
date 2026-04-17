@@ -647,7 +647,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             self.lastPromptShown = Date()
-            window.show()
+            window.show(startActive: !isAutoPrompt)
         }
     }
 

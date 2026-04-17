@@ -6,6 +6,8 @@ class ProjectPromptWindow: NSPanel {
     var onDismiss: (() -> Void)?
 
     private var comboBox: NSComboBox!
+    private var idleContainer: NSView!
+    private var inputContainer: NSView!
 
     private static let W: CGFloat = 400
     private static let H: CGFloat = 58
@@ -51,13 +53,15 @@ class ProjectPromptWindow: NSPanel {
         blur.layer?.cornerRadius = 10
         blur.layer?.masksToBounds = true
 
-        // Label
+        // MARK: Input view
+
+        inputContainer = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+
         let label = NSTextField(labelWithString: "Working on?")
         label.font = .systemFont(ofSize: 10, weight: .medium)
         label.textColor = .secondaryLabelColor
         label.frame = NSRect(x: 12, y: 38, width: 200, height: 12)
 
-        // Combo box
         comboBox = NSComboBox(frame: NSRect(x: 10, y: 10, width: 200, height: 26))
         comboBox.placeholderString = "Project name…"
         comboBox.font = .systemFont(ofSize: 13)
@@ -70,14 +74,9 @@ class ProjectPromptWindow: NSPanel {
         comboBox.target = self
         comboBox.action = #selector(saveAction)
 
-        if !recentProjects.isEmpty {
-            comboBox.addItems(withObjectValues: recentProjects)
-        }
-        if !currentProject.isEmpty {
-            comboBox.stringValue = currentProject
-        }
+        if !recentProjects.isEmpty { comboBox.addItems(withObjectValues: recentProjects) }
+        if !currentProject.isEmpty { comboBox.stringValue = currentProject }
 
-        // Skip button
         let skipBtn = NSButton(title: "Skip", target: self, action: #selector(skipAction))
         skipBtn.bezelStyle = .recessed
         skipBtn.controlSize = .small
@@ -85,14 +84,12 @@ class ProjectPromptWindow: NSPanel {
         skipBtn.frame = NSRect(x: 216, y: 14, width: 52, height: 18)
         skipBtn.keyEquivalent = "\u{1b}"
 
-        // Break button
         let breakBtn = NSButton(title: "Break", target: self, action: #selector(breakAction))
         breakBtn.bezelStyle = .recessed
         breakBtn.controlSize = .small
         breakBtn.font = .systemFont(ofSize: 11)
         breakBtn.frame = NSRect(x: 274, y: 14, width: 52, height: 18)
 
-        // Save button
         let saveBtn = NSButton(title: "Save", target: self, action: #selector(saveAction))
         saveBtn.bezelStyle = .recessed
         saveBtn.controlSize = .small
@@ -100,17 +97,57 @@ class ProjectPromptWindow: NSPanel {
         saveBtn.frame = NSRect(x: 332, y: 14, width: 52, height: 18)
         saveBtn.keyEquivalent = "\r"
 
-        blur.addSubview(label)
-        blur.addSubview(comboBox)
-        blur.addSubview(skipBtn)
-        blur.addSubview(breakBtn)
-        blur.addSubview(saveBtn)
+        inputContainer.addSubview(label)
+        inputContainer.addSubview(comboBox)
+        inputContainer.addSubview(skipBtn)
+        inputContainer.addSubview(breakBtn)
+        inputContainer.addSubview(saveBtn)
+
+        // MARK: Idle view
+
+        let tappable = TappableView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        tappable.onTap = { [weak self] in self?.activate() }
+
+        let idleLabel = NSTextField(labelWithString: "What's up?")
+        idleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        idleLabel.textColor = .labelColor
+        idleLabel.frame = NSRect(x: 14, y: (h - 16) / 2, width: 270, height: 16)
+        tappable.addSubview(idleLabel)
+
+        let idleSkip = NSButton(title: "Skip", target: self, action: #selector(skipAction))
+        idleSkip.bezelStyle = .recessed
+        idleSkip.controlSize = .small
+        idleSkip.font = .systemFont(ofSize: 11)
+        idleSkip.frame = NSRect(x: 332, y: 14, width: 52, height: 18)
+        tappable.addSubview(idleSkip)
+
+        idleContainer = tappable
+
+        blur.addSubview(inputContainer)
+        blur.addSubview(idleContainer)
         contentView = blur
     }
 
-    /// Show without stealing keyboard focus from whatever the user is doing.
-    func show() {
+    private func activate() {
+        idleContainer.isHidden = true
+        inputContainer.isHidden = false
+        makeKey()
+        makeFirstResponder(comboBox)
+    }
+
+    func show(startActive: Bool = false) {
+        if startActive {
+            idleContainer.isHidden = true
+            inputContainer.isHidden = false
+        } else {
+            idleContainer.isHidden = false
+            inputContainer.isHidden = true
+        }
         orderFront(nil)
+        if startActive {
+            makeKey()
+            makeFirstResponder(comboBox)
+        }
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -140,4 +177,10 @@ class ProjectPromptWindow: NSPanel {
         close()
         onDismiss?()
     }
+}
+
+private class TappableView: NSView {
+    var onTap: (() -> Void)?
+    override func mouseDown(with event: NSEvent) { onTap?() }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
