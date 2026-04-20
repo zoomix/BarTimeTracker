@@ -16,13 +16,8 @@ class ProjectPromptWindow: NSPanel {
         let w = ProjectPromptWindow.W
         let h = ProjectPromptWindow.H
 
-        let screen = NSScreen.main ?? NSScreen.screens[0]
-        let menuBarHeight = screen.frame.height - screen.visibleFrame.maxY
-        let x = screen.frame.midX - w / 2
-        let y = screen.frame.maxY - menuBarHeight - h - 10
-
         super.init(
-            contentRect: NSRect(x: x, y: y, width: w, height: h),
+            contentRect: NSRect(x: 0, y: 0, width: w, height: h),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -111,15 +106,22 @@ class ProjectPromptWindow: NSPanel {
         let idleLabel = NSTextField(labelWithString: "What's up?")
         idleLabel.font = .systemFont(ofSize: 13, weight: .medium)
         idleLabel.textColor = .labelColor
-        idleLabel.frame = NSRect(x: 14, y: (h - 16) / 2, width: 270, height: 16)
+        idleLabel.frame = NSRect(x: 14, y: (h - 16) / 2, width: 250, height: 16)
         tappable.addSubview(idleLabel)
 
         let idleSkip = NSButton(title: "Skip", target: self, action: #selector(skipAction))
         idleSkip.bezelStyle = .recessed
         idleSkip.controlSize = .small
         idleSkip.font = .systemFont(ofSize: 11)
-        idleSkip.frame = NSRect(x: 332, y: 14, width: 52, height: 18)
+        idleSkip.frame = NSRect(x: 274, y: 14, width: 52, height: 18)
         tappable.addSubview(idleSkip)
+
+        let idleSame = NSButton(title: "Same", target: self, action: #selector(saveAction))
+        idleSame.bezelStyle = .recessed
+        idleSame.controlSize = .small
+        idleSame.font = .systemFont(ofSize: 11)
+        idleSame.frame = NSRect(x: 332, y: 14, width: 52, height: 18)
+        tappable.addSubview(idleSame)
 
         idleContainer = tappable
 
@@ -143,7 +145,17 @@ class ProjectPromptWindow: NSPanel {
             idleContainer.isHidden = false
             inputContainer.isHidden = true
         }
-        orderFront(nil)
+
+        // Recalculate position each time — screen layout may have changed (e.g. after screensaver)
+        let w = ProjectPromptWindow.W
+        let h = ProjectPromptWindow.H
+        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let menuBarHeight = screen.frame.height - screen.visibleFrame.maxY
+        let x = screen.frame.midX - w / 2
+        let y = screen.frame.maxY - menuBarHeight - h - 10
+        setFrameOrigin(NSPoint(x: x, y: y))
+
+        orderFrontRegardless()
         if startActive {
             makeKey()
             makeFirstResponder(comboBox)
