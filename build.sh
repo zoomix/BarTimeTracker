@@ -13,9 +13,13 @@ mkdir -p "$BINARY_DIR"
 mkdir -p "$RESOURCES_DIR"
 
 echo "Compiling Swift sources..."
-swiftc Sources/main.swift Sources/AppDelegate.swift Sources/ProjectPromptWindow.swift \
+swiftc Sources/BarTimeTrackerCore/TimeCalculations.swift \
+    Sources/BarTimeTracker/main.swift \
+    Sources/BarTimeTracker/AppDelegate.swift \
+    Sources/BarTimeTracker/ProjectPromptWindow.swift \
     -framework AppKit \
     -framework Foundation \
+    -framework IOKit \
     -o "$BINARY_DIR/BarTimeTracker"
 
 echo "Copying Info.plist..."

@@ -1,4 +1,18 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+
+# App bundle (built by build.sh)
+BarTimeTracker.app/
+
+# macOS
+.DS_Store
+
+# Claude Code local settings
 .claude/settings.local.json
-BarTimeTracker.app
-.claude/settings.json
-.claude/agents/entire-search.md

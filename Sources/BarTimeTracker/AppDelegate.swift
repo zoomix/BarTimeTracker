@@ -1,28 +1,7 @@
 import AppKit
 import Foundation
 import IOKit.pwr_mgt
-
-struct ScreenEvent: Codable {
-    enum Kind: String, Codable {
-        case on, off
-        case screensaverOn, screensaverOff
-
-        /// True when this event means user is away from screen
-        var isAway: Bool { self == .off || self == .screensaverOn }
-    }
-    let kind: Kind
-    let time: Date
-}
-
-struct ProjectEntry: Codable {
-    let project: String
-    let time: Date
-}
-
-struct AppData: Codable {
-    var screenEvents: [ScreenEvent] = []
-    var projectEntries: [ProjectEntry] = []
-}
+import BarTimeTrackerCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
@@ -191,188 +170,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         scheduleProjectTimer()
     }
 
-    // MARK: - Time Calculation
-
-    func totalOnTime(events: [ScreenEvent]) -> TimeInterval {
-        var total: TimeInterval = 0
-        var lastOn: Date?
-
-        for event in events {
-            if event.kind == .on || event.kind == .screensaverOff {
-                if lastOn == nil { lastOn = event.time }  // don't overwrite — keep earliest start
-            } else if event.kind.isAway, let on = lastOn {
-                total += event.time.timeIntervalSince(on)
-                lastOn = nil
-            }
-        }
-        if let on = lastOn { total += Date().timeIntervalSince(on) }
-        return total
-    }
-
-    /// Worked time = sum of span durations minus break-attributed time within each span.
-    /// This counts project-attributed offline time (meetings etc.) as worked, unlike raw screen-on time.
-    func workedTime(spans: [TimeSpan], allEntries: [ProjectEntry], firstOnTime: Date?) -> TimeInterval {
-        spans.reduce(0.0) { total, span in
-            let spanEnd = span.end ?? Date()
-            let spanDur = spanEnd.timeIntervalSince(span.start)
-            let d = computeProjectDurations(allEntries: allEntries, firstOnTime: firstOnTime,
-                                            spanStart: span.start, spanEnd: spanEnd)
-            let breakDur = d.first(where: { $0.project == "Break" })?.duration ?? 0
-            return total + max(0, spanDur - breakDur)
-        }
-    }
-
-    struct TimeSpan {
-        let start: Date
-        let end: Date?   // nil = still active
-        let isActive: Bool
-    }
-
-    func buildTimeSpans(from events: [ScreenEvent],
-                        projectEntries: [ProjectEntry] = [],
-                        mergeThreshold: TimeInterval = 3 * 60) -> [TimeSpan] {
-        // Build raw completed spans
-        var rawSpans: [(start: Date, end: Date)] = []
-        var spanStart: Date? = nil
-
-        for event in events {
-            switch event.kind {
-            case .on, .screensaverOff:
-                if spanStart == nil { spanStart = event.time }
-            case .off, .screensaverOn:
-                if let s = spanStart {
-                    rawSpans.append((start: s, end: event.time))
-                    spanStart = nil
-                }
-            }
-        }
-        let activeStart = spanStart  // non-nil if screen still on
-
-        // Gap covered by a project (not Break) = spans should be merged regardless of duration.
-        // The first entry at or after gapEnd tells us what the user was doing during the gap.
-        func gapCoveredByWork(gapEnd: Date) -> Bool {
-            guard let first = projectEntries.first(where: { $0.time >= gapEnd }) else { return false }
-            return first.project != "Break"
-        }
-
-        // Merge completed spans whose gap is < threshold OR covered by non-Break project
-        var merged: [(start: Date, end: Date)] = []
-        for span in rawSpans {
-            if let last = merged.last {
-                let gap = span.start.timeIntervalSince(last.end)
-                if gap < mergeThreshold || gapCoveredByWork(gapEnd: span.start) {
-                    merged[merged.count - 1] = (start: last.start, end: span.end)
-                    continue
-                }
-            }
-            merged.append(span)
-        }
-
-        // Attach or append active span
-        var result = merged.map { TimeSpan(start: $0.start, end: $0.end, isActive: false) }
-        if let active = activeStart {
-            if let last = merged.last {
-                let gap = active.timeIntervalSince(last.end)
-                if gap < mergeThreshold || gapCoveredByWork(gapEnd: active) {
-                    result[result.count - 1] = TimeSpan(start: last.start, end: nil, isActive: true)
-                } else {
-                    result.append(TimeSpan(start: active, end: nil, isActive: true))
-                }
-            } else {
-                result.append(TimeSpan(start: active, end: nil, isActive: true))
-            }
-        }
-        return result
-    }
-
-    /// For each project whose entry falls inside [spanStart, spanEnd], compute how much
-    /// time within that span is attributed to it.
-    ///
-    /// Attribution rule: entry[i] claims the interval [entry[i-1].time, entry[i].time]
-    /// (or [firstOnTime, entry[0].time] for the first entry of the day).
-    /// The last entry additionally claims [entry.last.time, spanEnd] (still working on it).
-    /// Each claim is intersected with [spanStart, spanEnd].
-    func computeProjectDurations(
-        allEntries: [ProjectEntry],
-        firstOnTime: Date?,
-        spanStart: Date,
-        spanEnd: Date
-    ) -> [(project: String, duration: TimeInterval)] {
-        guard !allEntries.isEmpty else { return [] }
-
-        let dayStart = firstOnTime ?? allEntries[0].time
-        var durations: [String: TimeInterval] = [:]
-
-        for i in 0..<allEntries.count {
-            let entry = allEntries[i]
-            let claimStart = i == 0 ? dayStart : allEntries[i - 1].time
-            let intStart = max(claimStart, spanStart)
-            let intEnd   = min(entry.time, spanEnd)
-            if intEnd > intStart {
-                durations[entry.project, default: 0] += intEnd.timeIntervalSince(intStart)
-            }
-        }
-
-        // Last entry also claims forwards to spanEnd
-        if let last = allEntries.last {
-            let intStart = max(last.time, spanStart)
-            if spanEnd > intStart {
-                durations[last.project, default: 0] += spanEnd.timeIntervalSince(intStart)
-            }
-        }
-
-        return durations
-            .map { (project: $0.key, duration: $0.value) }
-            .filter { $0.duration >= 30 }
-            .sorted { $0.duration > $1.duration }
-    }
-
-    /// Same pairing logic as totalOnTime — must stay in sync.
-    func screenOnIntervals(from events: [ScreenEvent]) -> [(start: Date, end: Date)] {
-        var intervals: [(start: Date, end: Date)] = []
-        var lastOn: Date?
-        for event in events {
-            if event.kind == .on || event.kind == .screensaverOff {
-                lastOn = event.time
-            } else if event.kind.isAway, let on = lastOn {
-                intervals.append((on, event.time))
-                lastOn = nil
-            }
-        }
-        if let on = lastOn { intervals.append((on, Date())) }
-        return intervals
-    }
-
-    /// Break time = only the screen-ON portion of break claim intervals.
-    /// Prevents over-subtracting when screen was already off during the break period.
-    func effectiveBreakTime(allEntries: [ProjectEntry], firstOnTime: Date?,
-                            onIntervals: [(start: Date, end: Date)]) -> TimeInterval {
-        guard !allEntries.isEmpty else { return 0 }
-        let dayStart = firstOnTime ?? allEntries[0].time
-
-        func intersect(_ claimStart: Date, _ claimEnd: Date) -> TimeInterval {
-            onIntervals.reduce(0) { sum, iv in
-                let s = max(claimStart, iv.start), e = min(claimEnd, iv.end)
-                return e > s ? sum + e.timeIntervalSince(s) : sum
-            }
-        }
-
-        var total: TimeInterval = 0
-        for i in 0..<allEntries.count {
-            guard allEntries[i].project == "Break" else { continue }
-            let claimStart = i == 0 ? dayStart : allEntries[i - 1].time
-            total += intersect(claimStart, allEntries[i].time)
-        }
-        if allEntries.last?.project == "Break" {
-            total += intersect(allEntries.last!.time, Date())
-        }
-        return total
-    }
+    // MARK: - Time Calculation (delegated to BarTimeTrackerCore)
 
     func formatDuration(_ interval: TimeInterval) -> String {
-        let h = Int(interval) / 3600
-        let m = (Int(interval) % 3600) / 60
-        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
+        TimeCalculations.formatDuration(interval)
     }
 
     func screensaverTimeout() -> TimeInterval {
@@ -505,8 +306,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .sorted { $0.time < $1.time }
         let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
 
-        let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
-        let worked = workedTime(spans: spans, allEntries: dayProjects, firstOnTime: firstOnTime)
+        let now = Date()
+        let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
+        let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
 
         let totalItem = NSMenuItem(title: "Worked: \(formatDuration(worked))", action: nil, keyEquivalent: "")
         totalItem.isEnabled = false
@@ -528,8 +330,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     .filter { $0.time >= span.start && $0.time <= spanEnd }
                     .map { $0.project })
 
-                let durations = computeProjectDurations(
-                    allEntries: dayProjects,
+                let durations = TimeCalculations.projectDurations(
+                    entries: dayProjects,
                     firstOnTime: firstOnTime,
                     spanStart: span.start,
                     spanEnd: spanEnd
@@ -737,7 +539,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .sorted { $0.time < $1.time }
             let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
             let dayStart = firstOnTime ?? day
-            let spans = buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects)
+            let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: Date())
             let dateStr = dateFmt.string(from: day)
 
             func addRow(_ start: Date, _ end: Date, _ project: String) {
