@@ -138,7 +138,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let start = screensaverStartTime {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
-            if absence > 60 { askForProject(isAutoPrompt: true) }
+            if absence > 60 {
+                // Delay slightly — screen layout isn't stable the instant the screensaver ends
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.askForProject(isAutoPrompt: true)
+                }
+            }
         }
     }
 
@@ -617,9 +622,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
-            // Don't stack prompts — but ensure timer survives
+            // Don't stack prompts — but resurface existing window if manually triggered
             guard self.promptWindow == nil else {
-                if isAutoPrompt { self.scheduleProjectTimer() }
+                if !isAutoPrompt { self.promptWindow?.show() }
+                else { self.scheduleProjectTimer() }
                 return
             }
 
