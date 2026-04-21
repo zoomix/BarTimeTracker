@@ -1,7 +1,6 @@
 import AppKit
 import Foundation
 import IOKit.pwr_mgt
-import BarTimeTrackerCore
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
