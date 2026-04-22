@@ -1,0 +1,3 @@
+The weekly view needs to be able to change weeks and scroll vertically to view more hours than between 7 and 19. That was suppsoed to be just a default view. 
+
+Also - for some reason I can't see todays data.
