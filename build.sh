@@ -17,6 +17,7 @@ swiftc Sources/BarTimeTrackerCore/TimeCalculations.swift \
     Sources/BarTimeTracker/main.swift \
     Sources/BarTimeTracker/AppDelegate.swift \
     Sources/BarTimeTracker/ProjectPromptWindow.swift \
+    Sources/BarTimeTracker/WeekTimelineWindow.swift \
     -framework AppKit \
     -framework Foundation \
     -framework IOKit \

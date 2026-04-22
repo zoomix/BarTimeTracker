@@ -1,12 +1,16 @@
 import AppKit
 import Foundation
 import IOKit.pwr_mgt
+#if canImport(BarTimeTrackerCore)
+import BarTimeTrackerCore
+#endif
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     var statusItem: NSStatusItem!
     var projectTimer: Timer?
     var currentProject: String = ""
     var promptWindow: ProjectPromptWindow?
+    var weekTimelineWindow: WeekTimelineWindow?
     var isFocusActive: Bool = false
     var lastPromptShown: Date?
     var nextPromptDate: Date?
@@ -61,6 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func saveData(_ data: AppData) {
         if let encoded = try? encoder.encode(data) {
             try? encoded.write(to: dataFileURL, options: .atomic)
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.weekTimelineWindow?.refresh()
         }
     }
 
@@ -238,6 +245,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let setItem = NSMenuItem(title: "Set project…", action: #selector(askForProjectManually), keyEquivalent: "p")
         setItem.target = self
         menu.addItem(setItem)
+
+        let weekViewItem = NSMenuItem(title: "Week View…", action: #selector(openWeekView), keyEquivalent: "w")
+        weekViewItem.target = self
+        menu.addItem(weekViewItem)
 
         // Interval submenu
         let intervalItem = NSMenuItem(title: "Check every…", action: nil, keyEquivalent: "")
@@ -599,5 +610,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             lines.append("\(row.date);\(timeFmt.string(from: row.start));\(timeFmt.string(from: row.end));\(durMin);\(csvField(row.project))")
         }
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Week view
+
+    @objc func openWeekView() {
+        if weekTimelineWindow == nil {
+            weekTimelineWindow = WeekTimelineWindow(dataStore: self)
+        }
+        weekTimelineWindow?.refresh()
+        weekTimelineWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
