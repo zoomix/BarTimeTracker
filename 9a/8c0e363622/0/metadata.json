@@ -1,0 +1,73 @@
+{
+  "cli_version": "0.5.5",
+  "checkpoint_id": "9a8c0e363622",
+  "session_id": "63c2847e-0b36-4b9f-82ea-383453cf39ad",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-22T15:11:21.395548Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift",
+    "build.sh"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "bc61afd287f2",
+  "token_usage": {
+    "input_tokens": 2906,
+    "cache_creation_tokens": 381175,
+    "cache_read_tokens": 8974401,
+    "output_tokens": 91784,
+    "api_call_count": 128
+  },
+  "session_metrics": {
+    "turn_count": 4
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-22T15:11:21.376878Z",
+    "agent_lines": 608,
+    "agent_removed": 1,
+    "human_added": 693,
+    "human_modified": 1,
+    "human_removed": 0,
+    "total_committed": 1302,
+    "total_lines_changed": 1303,
+    "agent_percentage": 46.73829623944743,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 9,
+      "user_lines_removed": 2,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "Sources/ProjectPromptWindow.swift": 9
+      },
+      "user_removed_per_file": {
+        "Sources/ProjectPromptWindow.swift": 2
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 25,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "Package.swift": 25
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 25,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9354,
+      "agent_lines_removed": 1008,
+      "user_added_per_file": {
+        "Package.swift": 25
+      }
+    }
+  ]
+}

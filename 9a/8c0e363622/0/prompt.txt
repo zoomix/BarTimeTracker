@@ -1,0 +1,55 @@
+Can we see that mac's "focus" feature is turned on and not show the popups then (it can interrupt a presentation and that kinda sucks)
+
+---
+
+Yes please - because I was  in a meeting with the focus mode enabled and the popup came upanyway
+
+---
+
+Done
+
+---
+
+You know what - I don't think this is gonna work. 
+
+Can you search the internet to find out if you can extract the Do Not Disturb state programatically. You don't really need to listen to changes, you can just delay showing the popup until it's back
+
+---
+
+enabled
+
+---
+
+Hey. Come on. Look back at this and be real with me. Is this gonna work? How have other people done it? Maybe it's just not meant to be done.
+
+---
+
+I like option 1. I'm likely to forget it otherwise
+
+---
+
+When I wander off to get a coffee, the screensaver starts. The window should popup to ask me where I was and wether that was a break or a meeting. but.. it does and it doesn't.
+
+For instance now - the window is there, but invisible. I can see it flicker on and off as I switch between my Spaces, but I can never see it. Even selecting "Select project" in the menu doesn't show it.
+
+Happened twice today. both times when the screensaved had turnde on
+
+---
+
+@/Users/srdkvr/Library/Application Support/BarTimeTracker/events.json Can you write some unit tests for they daily periods based on this recorded data. 
+
+Write the unit tests on a day-by-day instance prentending the time is just after each day. Use the calculations you have now. I want to test for total time and time spent on activity  on a day-by-day basis. 
+
+Write the tests, I'll double check them to see it's what I intended and then you can adapt the algorithm to make the tests pass again.
+
+---
+
+Did you.. not write BarTimeTrackerTests on purpose or you just waiting for my blessing?
+
+---
+
+yes please
+
+---
+
+kk. Please update the .gitignore file so I don't have to commit the hash sallad of caches and build artifacts
