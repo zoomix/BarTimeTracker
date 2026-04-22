@@ -3,7 +3,7 @@
   "checkpoint_id": "9a8c0e363622",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 7,
+  "checkpoints_count": 8,
   "files_touched": [
     "Sources/BarTimeTracker/AppDelegate.swift",
     "Sources/BarTimeTracker/WeekTimelineWindow.swift",
@@ -27,13 +27,19 @@
       "transcript": "/9a/8c0e363622/2/full.jsonl",
       "content_hash": "/9a/8c0e363622/2/content_hash.txt",
       "prompt": "/9a/8c0e363622/2/prompt.txt"
+    },
+    {
+      "metadata": "/9a/8c0e363622/3/metadata.json",
+      "transcript": "/9a/8c0e363622/3/full.jsonl",
+      "content_hash": "/9a/8c0e363622/3/content_hash.txt",
+      "prompt": "/9a/8c0e363622/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 2943,
-    "cache_creation_tokens": 468321,
-    "cache_read_tokens": 10812854,
-    "output_tokens": 149603,
-    "api_call_count": 159
+    "input_tokens": 2953,
+    "cache_creation_tokens": 489153,
+    "cache_read_tokens": 10948240,
+    "output_tokens": 150495,
+    "api_call_count": 167
   }
 }
