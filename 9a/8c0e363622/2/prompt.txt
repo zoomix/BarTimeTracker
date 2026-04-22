@@ -1,0 +1,35 @@
+Alright. We're working on a thing that keeps track of project a developer is working on on a daily basis. I think we've reached the point where we need a small UI that we can edit the entries in.
+
+So. I want a menu button that opens a visual representation of the current week. Allow me to go back and forth. 
+
+Show a calendar-like view of each day. Show entries where there's data (scree on/off, screensaver on/off, projec time entries). Show them in timespans. Assume work day starts at 07 and end at 19. Allow the user to scroll vertically if necessary. Fit horizontally.
+
+Render timespans in color. off -> on (light green - working). off -> on (light blue - AFK). 
+
+Show one week at a time. Allow adding of project markers. Allow merging.
+
+---
+
+Alright. We're working on a thing that keeps track of project a developer is working on on a daily basis. I think we've reached the point where we need a small UI that we can edit the entries in.
+
+So. I want a menu button that opens a visual representation of the current week. Allow me to go back and forth. 
+
+Show a calendar-like view of each day. Show entries where there's data (scree on/off, screensaver on/off, projec time entries). Show them in timespans. Assume work day starts at 07 and end at 19. Allow the user to scroll vertically if necessary. Fit horizontally.
+
+Render timespans in color. off -> on (light green - working). off -> on (light blue - AFK). 
+
+Show one week at a time. Allow adding of project markers. Allow merging.
+
+Be creative but remember you're building this tool for a user that just wants help keeping track of what they were working on and for how long on any given day. Work mostly occurs between 08 and 17 on weekdays. Also, sometimes work is performed while AFK (presentations, customer meetings etc)
+
+---
+
+rebuild and restart the app please
+
+---
+
+Neat!
+
+Create timespans for the different projects. Give each project their own light color. Merge consecutive timestpans. Let the project time entries only be a line that show a text when you hover it - not all the time as is now.
+
+When scrolling with the mouse, show a horizontal line on that day that has the time you are hovering.
