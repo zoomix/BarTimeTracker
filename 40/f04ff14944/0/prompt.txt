@@ -1,0 +1,7 @@
+When moving the mouse around, if I get close to an existing time marker, it shows the time and project name at that time. That's fantastic. I want to change the click action though. When I click while the hover is visible, I want to be able to edit that exact project entry. 
+
+For instance - if i mistakenly marked the time as break, i should be able to change that here
+
+---
+
+Yes please. Add a Delete button. And then rebuild and restart the app for me.
