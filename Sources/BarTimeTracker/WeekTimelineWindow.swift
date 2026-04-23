@@ -212,6 +212,7 @@ class WeekTimelineWindow: NSWindow {
         timelineView.autoresizingMask = .width
         timelineView.onAdd = { [weak self] date in self?.presentAddSheet(for: date) }
         timelineView.onMerge = { [weak self] date, project in self?.addEntry(date: date, project: project) }
+        timelineView.onEdit = { [weak self] entry in self?.presentEditSheet(for: entry) }
 
         scrollView.documentView = timelineView
         cv.addSubview(scrollView)
@@ -279,6 +280,29 @@ class WeekTimelineWindow: NSWindow {
         reload()
     }
 
+    private func updateEntry(_ entry: ProjectEntry, project: String) {
+        guard let store = dataStore else { return }
+        var data = store.loadData()
+        guard let idx = data.projectEntries.firstIndex(where: { $0.time == entry.time && $0.project == entry.project }) else {
+            return
+        }
+        data.projectEntries[idx] = ProjectEntry(project: project, time: entry.time)
+        data.projectEntries.sort { $0.time < $1.time }
+        store.saveData(data)
+        reload()
+    }
+
+    private func deleteEntry(_ entry: ProjectEntry) {
+        guard let store = dataStore else { return }
+        var data = store.loadData()
+        guard let idx = data.projectEntries.firstIndex(where: { $0.time == entry.time && $0.project == entry.project }) else {
+            return
+        }
+        data.projectEntries.remove(at: idx)
+        store.saveData(data)
+        reload()
+    }
+
     private func recentProjectNames() -> [String] {
         let entries = (dataStore?.loadData().projectEntries ?? []).reversed()
         var seen = Set<String>()
@@ -306,6 +330,33 @@ class WeekTimelineWindow: NSWindow {
             let project = combo.stringValue.trimmingCharacters(in: .whitespaces)
             guard !project.isEmpty else { return }
             self?.addEntry(date: date, project: project)
+        }
+    }
+
+    private func presentEditSheet(for entry: ProjectEntry) {
+        guard entry.time <= Date() else { return }
+        let fmt = DateFormatter(); fmt.timeStyle = .short
+        let alert = NSAlert()
+        alert.messageText = "Edit entry at \(fmt.string(from: entry.time))"
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Delete")
+        let combo = NSComboBox(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        combo.placeholderString = "Project name…"
+        combo.addItems(withObjectValues: recentProjectNames())
+        combo.completes = true
+        combo.stringValue = entry.project
+        alert.accessoryView = combo
+        alert.window.initialFirstResponder = combo
+        alert.beginSheetModal(for: self) { [weak self] resp in
+            if resp == .alertThirdButtonReturn {
+                self?.deleteEntry(entry)
+                return
+            }
+            guard resp == .alertFirstButtonReturn else { return }
+            let project = combo.stringValue.trimmingCharacters(in: .whitespaces)
+            guard !project.isEmpty else { return }
+            self?.updateEntry(entry, project: project)
         }
     }
 }
@@ -348,6 +399,7 @@ private class TimelineContentView: NSView {
     var showNow = true
     var onAdd: ((Date) -> Void)?
     var onMerge: ((Date, String) -> Void)?
+    var onEdit: ((ProjectEntry) -> Void)?
 
     override var isFlipped: Bool { true }
     private var colW: CGFloat { (bounds.width - timeColW) / 7 }
@@ -355,12 +407,39 @@ private class TimelineContentView: NSView {
     // Hover state
     private var hoverDayIdx: Int = -1
     private var hoverY: CGFloat = 0
+    private var hoverEntry: ProjectEntry? = nil
     private var hoverEntryLabel: String? = nil   // set when within snap distance of an entry line
     private var trackingArea: NSTrackingArea?
 
     private let timeFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f
     }()
+
+    private func isSameEntry(_ lhs: ProjectEntry?, _ rhs: ProjectEntry?) -> Bool {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?):
+            return lhs.time == rhs.time && lhs.project == rhs.project
+        case (nil, nil):
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func hoveredEntry(dayIndex: Int, y: CGFloat) -> ProjectEntry? {
+        guard dayIndex >= 0 && dayIndex < columns.count else { return nil }
+        let snapPx: CGFloat = 5
+        for entry in columns[dayIndex].projects {
+            guard !entry.project.hasPrefix("~") else { continue }
+            let mins = minsOfDay(entry.time, relativeTo: columns[dayIndex].date)
+            guard mins >= visibleStartMin && mins < visibleEndMin else { continue }
+            let ey = yFor(min: mins)
+            if abs(ey - y) <= snapPx {
+                return entry
+            }
+        }
+        return nil
+    }
 
     // MARK: Draw
 
@@ -567,25 +646,17 @@ private class TimelineContentView: NSView {
         let newY = loc.y
 
         // Check proximity to entry lines
+        let entry = hoveredEntry(dayIndex: newDay, y: newY)
         var entryLabel: String? = nil
-        if newDay >= 0 && newDay < columns.count {
-            let snapPx: CGFloat = 5
-            for entry in columns[newDay].projects {
-                guard !entry.project.hasPrefix("~") else { continue }
-                let mins = minsOfDay(entry.time, relativeTo: columns[newDay].date)
-                guard mins >= visibleStartMin && mins < visibleEndMin else { continue }
-                let ey = yFor(min: mins)
-                if abs(ey - newY) <= snapPx {
-                    let name = entry.project == "Break" ? "⏸ Break" : entry.project
-                    entryLabel = "\(timeFmt.string(from: entry.time))  \(name)"
-                    break
-                }
-            }
+        if let entry {
+            let name = entry.project == "Break" ? "⏸ Break" : entry.project
+            entryLabel = "\(timeFmt.string(from: entry.time))  \(name)"
         }
 
-        if hoverDayIdx != newDay || abs(hoverY - newY) > 0.5 || hoverEntryLabel != entryLabel {
+        if hoverDayIdx != newDay || abs(hoverY - newY) > 0.5 || hoverEntryLabel != entryLabel || !isSameEntry(hoverEntry, entry) {
             hoverDayIdx = newDay
             hoverY = newY
+            hoverEntry = entry
             hoverEntryLabel = entryLabel
             needsDisplay = true
         }
@@ -593,6 +664,7 @@ private class TimelineContentView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         hoverDayIdx = -1
+        hoverEntry = nil
         hoverEntryLabel = nil
         needsDisplay = true
     }
@@ -601,7 +673,11 @@ private class TimelineContentView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let loc = convert(event.locationInWindow, from: nil)
-        guard let (date, _) = resolveClick(loc), date <= Date() else { return }
+        guard let (date, colIdx) = resolveClick(loc), date <= Date() else { return }
+        if let entry = hoveredEntry(dayIndex: colIdx, y: loc.y) {
+            onEdit?(entry)
+            return
+        }
         onAdd?(date)
     }
 
