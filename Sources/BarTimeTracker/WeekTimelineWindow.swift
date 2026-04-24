@@ -164,11 +164,11 @@ class WeekTimelineWindow: NSWindow {
     private var timelineView: TimelineContentView!
     private var dayHeaderView: DayNameHeaderView!
     private var daySummaryView: DaySummaryView!
-    private var weekLabel: NSTextField!
-    private var nextBtn: NSButton!
+    private var weekNavControl: NSSegmentedControl!
+    private var todayBtn: NSButton!
     private var scrollView: NSScrollView!
 
-    private let topBarH: CGFloat = 48
+    private let topBarH: CGFloat = 0
     private let namesH: CGFloat = 28
 
     init(dataStore: TimeDataStore) {
@@ -177,37 +177,48 @@ class WeekTimelineWindow: NSWindow {
                    styleMask: [.titled, .closable, .miniaturizable, .resizable],
                    backing: .buffered, defer: false)
         title = "Week View"
+        subtitle = ""
+        toolbarStyle = .unifiedCompact
         minSize = NSSize(width: 640, height: 460)
         isReleasedWhenClosed = false
         center()
+        installTitlebarControls()
         buildUI()
         reload()
+    }
+
+    private func installTitlebarControls() {
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.layoutAttribute = .right
+
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 214, height: 32))
+
+        weekNavControl = NSSegmentedControl(
+            labels: ["Previous", "Next"],
+            trackingMode: .momentary,
+            target: self,
+            action: #selector(changeWeekFromSegment(_:))
+        )
+        weekNavControl.segmentStyle = .texturedRounded
+        weekNavControl.controlSize = .small
+        weekNavControl.setWidth(78, forSegment: 0)
+        weekNavControl.setWidth(54, forSegment: 1)
+        weekNavControl.frame = NSRect(x: 0, y: 2, width: 132, height: 28)
+
+        todayBtn = actionButton("This Week", #selector(goToCurrentWeek), NSRect(x: 138, y: 2, width: 76, height: 28))
+        todayBtn.keyEquivalent = "0"
+        todayBtn.keyEquivalentModifierMask = [.command]
+
+        container.addSubview(weekNavControl)
+        container.addSubview(todayBtn)
+        accessory.view = container
+        addTitlebarAccessoryViewController(accessory)
     }
 
     private func buildUI() {
         let cv = contentView!
         let w = cv.bounds.width
         let h = cv.bounds.height
-
-        let topBar = NSView(frame: NSRect(x: 0, y: h - topBarH, width: w, height: topBarH))
-        topBar.autoresizingMask = [.width, .minYMargin]
-
-        let prevBtn = barButton("◀", #selector(prevWeek), NSRect(x: 12, y: 9, width: 36, height: 30))
-        nextBtn = barButton("▶", #selector(nextWeek), NSRect(x: w - 48, y: 9, width: 36, height: 30))
-        nextBtn.autoresizingMask = .minXMargin
-        nextBtn.isEnabled = false
-
-        weekLabel = NSTextField(labelWithString: "")
-        weekLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        weekLabel.alignment = .center
-        weekLabel.frame = NSRect(x: 56, y: 13, width: w - 112, height: 22)
-        weekLabel.autoresizingMask = .width
-        topBar.addSubview(prevBtn); topBar.addSubview(nextBtn); topBar.addSubview(weekLabel)
-
-        let sep = NSBox(frame: NSRect(x: 0, y: 0, width: w, height: 1))
-        sep.boxType = .separator; sep.autoresizingMask = .width
-        topBar.addSubview(sep)
-        cv.addSubview(topBar)
 
         dayHeaderView = DayNameHeaderView(frame: NSRect(x: 0, y: h - topBarH - namesH, width: w, height: namesH))
         dayHeaderView.autoresizingMask = [.width, .minYMargin]
@@ -249,16 +260,50 @@ class WeekTimelineWindow: NSWindow {
         }
     }
 
-    private func barButton(_ title: String, _ action: Selector, _ frame: NSRect) -> NSButton {
-        let b = NSButton(frame: frame)
-        b.title = title; b.target = self; b.action = action; b.bezelStyle = .rounded
+    private func actionButton(_ title: String, _ action: Selector, _ frame: NSRect) -> NSButton {
+        let b = NSButton(title: title, target: self, action: action)
+        b.frame = frame
+        b.bezelStyle = .rounded
+        b.isBordered = true
+        b.controlSize = .small
+        b.font = .systemFont(ofSize: 12, weight: .semibold)
+        b.contentTintColor = .labelColor
         return b
     }
 
-    @objc private func prevWeek() { weekOffset -= 1; nextBtn.isEnabled = true; reload() }
+    private func updateNavigationControls() {
+        weekNavControl.setEnabled(true, forSegment: 0)
+        weekNavControl.setEnabled(weekOffset < 0, forSegment: 1)
+        todayBtn.isEnabled = weekOffset != 0
+    }
+
+    @objc private func changeWeekFromSegment(_ sender: NSSegmentedControl) {
+        switch sender.selectedSegment {
+        case 0:
+            prevWeek()
+        case 1:
+            nextWeek()
+        default:
+            break
+        }
+        sender.selectedSegment = -1
+    }
+
+    @objc private func prevWeek() {
+        weekOffset -= 1
+        reload()
+    }
+
     @objc private func nextWeek() {
         guard weekOffset < 0 else { return }
-        weekOffset += 1; nextBtn.isEnabled = weekOffset < 0; reload()
+        weekOffset += 1
+        reload()
+    }
+
+    @objc private func goToCurrentWeek() {
+        guard weekOffset != 0 else { return }
+        weekOffset = 0
+        reload()
     }
 
     func refresh() {
@@ -289,7 +334,8 @@ class WeekTimelineWindow: NSWindow {
 
         let fmt = DateFormatter(); fmt.dateFormat = "MMM d"
         let a = fmt.string(from: days[0]); fmt.dateFormat = "d, yyyy"
-        weekLabel.stringValue = "\(a) – \(fmt.string(from: days[6]))"
+        subtitle = "\(a) – \(fmt.string(from: days[6]))"
+        updateNavigationControls()
 
         dayHeaderView.days = days; dayHeaderView.needsDisplay = true
         daySummaryView.update(columns: columns, now: now)
