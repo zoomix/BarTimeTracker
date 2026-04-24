@@ -1,0 +1,34 @@
+Add buttons so I can go back and forward between weeks. Also A button to go back to the current week. 
+Make it look nice please
+
+---
+
+I can't see them
+
+---
+
+Yeah, the buttons are there because I can click them. But they're still invisible. In both light and dark mode
+
+---
+
+No differnce. 
+
+Can you make the app start with the week view front and center?
+
+Can you add some text that I can read around the same area as the buttons. Print it in black
+
+---
+
+Still no text. Just white
+
+---
+
+The app doesn't start anymore
+
+---
+
+Aha! Look at that. I can see them now. They are very weirdly positioned (in the title bar of the window), but they are def there
+
+---
+
+Option 1 sounds great.
