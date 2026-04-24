@@ -1,0 +1,38 @@
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+---
+
+build and restart please
+
+---
+
+Ah. Position the text above the "Fri 24" not at hour 0:00. I can't read that. And, of course, it will need to be one line per project
+
+---
+
+Naah, something's messed up. The process starts but no longer shows up in the menu bar
+
+---
+
+Still doesn't show up
+
+---
+
+something jiggles the rest of the menu bar items for a split second but then disappears.
+
+---
+
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+---
+
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+Be clever about this. I like it pretty. It should be visible on the first load of the page (no scroling to see it). I'll be using this to report time in my time reporting tool
+
+---
+
+Build and restart it for me please
