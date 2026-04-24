@@ -45,23 +45,28 @@ private func mondayOf(weekOffset: Int) -> Date {
 
 // MARK: - Project color palette
 
+private func rgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, alpha: CGFloat = 1) -> NSColor {
+    NSColor(red: r / 255, green: g / 255, blue: b / 255, alpha: alpha)
+}
+
+// Keep hues distinguishable for common red/green color-vision deficiencies.
 private let projectPalette: [NSColor] = [
-    NSColor(red: 0.95, green: 0.72, blue: 0.72, alpha: 1),  // rose
-    NSColor(red: 0.98, green: 0.86, blue: 0.60, alpha: 1),  // peach
-    NSColor(red: 0.93, green: 0.93, blue: 0.58, alpha: 1),  // yellow
-    NSColor(red: 0.64, green: 0.91, blue: 0.68, alpha: 1),  // mint
-    NSColor(red: 0.60, green: 0.84, blue: 0.97, alpha: 1),  // sky
-    NSColor(red: 0.78, green: 0.70, blue: 0.97, alpha: 1),  // lavender
-    NSColor(red: 0.97, green: 0.70, blue: 0.91, alpha: 1),  // pink
-    NSColor(red: 0.62, green: 0.95, blue: 0.91, alpha: 1),  // teal
-    NSColor(red: 0.92, green: 0.78, blue: 0.60, alpha: 1),  // tan
-    NSColor(red: 0.74, green: 0.96, blue: 0.80, alpha: 1),  // seafoam
-    NSColor(red: 0.84, green: 0.74, blue: 0.97, alpha: 1),  // purple
-    NSColor(red: 0.97, green: 0.87, blue: 0.74, alpha: 1),  // apricot
+    rgb(78, 121, 167),   // blue
+    rgb(242, 142, 43),   // orange
+    rgb(118, 183, 178),  // teal
+    rgb(225, 87, 89),    // vermillion
+    rgb(156, 117, 95),   // cocoa
+    rgb(86, 180, 233),   // sky
+    rgb(176, 122, 161),  // plum
+    rgb(237, 201, 72),   // gold
+    rgb(89, 161, 79),    // moss
+    rgb(255, 157, 167),  // salmon
+    rgb(120, 94, 240),   // indigo
+    rgb(157, 193, 131),  // sage
 ]
 
 private func projectColor(_ project: String) -> NSColor {
-    if project == "Break" { return NSColor(red: 0.97, green: 0.84, blue: 0.58, alpha: 1) }
+    if project == "Break" { return rgb(221, 204, 119) }
     var h = 5381
     for c in project.unicodeScalars { h = ((h << 5) &+ h) &+ Int(c.value) }
     return projectPalette[abs(h) % projectPalette.count]
@@ -760,7 +765,7 @@ private class TimelineContentView: NSView {
         NSColor.separatorColor.withAlphaComponent(0.18).setFill()
         NSRect(x: x, y: 0, width: 0.5, height: dayH).fill()
 
-        // Left strip: screen activity (green = working, blue = AFK)
+        // Left strip: screen activity (blue = working, orange = AFK)
         for span in col.visualSpans {
             let s = max(minsOfDay(span.start, relativeTo: col.date), visibleStartMin)
             let e = min(minsOfDay(span.end, relativeTo: col.date), visibleEndMin)
@@ -768,8 +773,8 @@ private class TimelineContentView: NSView {
             let y1 = yFor(min: s); let y2 = yFor(min: e)
             let stripRect = CGRect(x: x + 1, y: y1, width: activityStripW - 1, height: y2 - y1)
             let stripColor: NSColor = span.kind == .working
-                ? NSColor(red: 0.40, green: 0.78, blue: 0.44, alpha: 0.75)
-                : NSColor(red: 0.35, green: 0.62, blue: 0.92, alpha: 0.75)
+                ? rgb(0, 114, 178, alpha: 0.78)
+                : rgb(230, 159, 0, alpha: 0.78)
             stripColor.setFill()
             NSBezierPath(roundedRect: stripRect, xRadius: 2, yRadius: 2).fill()
         }
