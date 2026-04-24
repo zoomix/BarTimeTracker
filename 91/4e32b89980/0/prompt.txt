@@ -80,3 +80,7 @@ Should I just restart my computer?
 Still nothing. 
 
 Can you make sure the app starts and open a welcome dialog for me at start?
+
+---
+
+Shoot. I see the dialog now - no icon though. BUuu
