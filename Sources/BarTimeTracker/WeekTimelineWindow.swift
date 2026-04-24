@@ -67,6 +67,12 @@ private func projectColor(_ project: String) -> NSColor {
     return projectPalette[abs(h) % projectPalette.count]
 }
 
+/// Format a time interval as decimal hours, suitable for pasting into a
+/// time-reporting tool. Always two decimals (e.g. "2.50", "6.75", "0.25").
+private func decimalHours(_ interval: TimeInterval) -> String {
+    String(format: "%.2f", interval / 3600)
+}
+
 // MARK: - Data models
 
 private struct VisualSpan {
@@ -152,9 +158,13 @@ class WeekTimelineWindow: NSWindow {
     private var weekOffset = 0
     private var timelineView: TimelineContentView!
     private var dayHeaderView: DayNameHeaderView!
+    private var daySummaryView: DaySummaryView!
     private var weekLabel: NSTextField!
     private var nextBtn: NSButton!
     private var scrollView: NSScrollView!
+
+    private let topBarH: CGFloat = 48
+    private let namesH: CGFloat = 28
 
     init(dataStore: TimeDataStore) {
         self.dataStore = dataStore
@@ -173,8 +183,6 @@ class WeekTimelineWindow: NSWindow {
         let cv = contentView!
         let w = cv.bounds.width
         let h = cv.bounds.height
-        let topBarH: CGFloat = 48
-        let namesH: CGFloat = 28
 
         let topBar = NSView(frame: NSRect(x: 0, y: h - topBarH, width: w, height: topBarH))
         topBar.autoresizingMask = [.width, .minYMargin]
@@ -200,7 +208,19 @@ class WeekTimelineWindow: NSWindow {
         dayHeaderView.autoresizingMask = [.width, .minYMargin]
         cv.addSubview(dayHeaderView)
 
-        let scrollH = h - topBarH - namesH
+        // Summary view is placed (and sized) in layoutSummaryAndScroll(); start with a
+        // sensible default so the initial layout is stable.
+        let initialSummaryH: CGFloat = DaySummaryView.minHeight
+        daySummaryView = DaySummaryView(frame: NSRect(
+            x: 0,
+            y: h - topBarH - namesH - initialSummaryH,
+            width: w,
+            height: initialSummaryH
+        ))
+        daySummaryView.autoresizingMask = [.width, .minYMargin]
+        cv.addSubview(daySummaryView)
+
+        let scrollH = h - topBarH - namesH - initialSummaryH
         scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: w, height: scrollH))
         scrollView.autoresizingMask = [.width, .height]
         scrollView.hasVerticalScroller = true
@@ -267,8 +287,34 @@ class WeekTimelineWindow: NSWindow {
         weekLabel.stringValue = "\(a) – \(fmt.string(from: days[6]))"
 
         dayHeaderView.days = days; dayHeaderView.needsDisplay = true
+        daySummaryView.update(columns: columns, now: now)
         timelineView.columns = columns; timelineView.showNow = weekOffset == 0
         timelineView.needsDisplay = true
+
+        layoutSummaryAndScroll()
+    }
+
+    /// Resize the summary band to fit the week's tallest day, and adjust the
+    /// scroll view below it to fill the remaining space.
+    private func layoutSummaryAndScroll() {
+        let cv = contentView!
+        let w = cv.bounds.width
+        let h = cv.bounds.height
+        let summaryH = daySummaryView.preferredHeight()
+
+        daySummaryView.frame = NSRect(
+            x: 0,
+            y: h - topBarH - namesH - summaryH,
+            width: w,
+            height: summaryH
+        )
+        scrollView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: w,
+            height: h - topBarH - namesH - summaryH
+        )
+        daySummaryView.needsDisplay = true
     }
 
     func addEntry(date: Date, project: String) {
@@ -389,6 +435,232 @@ private class DayNameHeaderView: NSView {
         }
         NSColor.separatorColor.setFill()
         NSRect(x: 0, y: 0, width: bounds.width, height: 0.5).fill()
+    }
+}
+
+// MARK: - Day summary (per-day project hour totals, always visible)
+
+/// Always-visible band above the scrolling timeline that shows, per day,
+/// a pill per project with the day's decimal hour total — designed to be
+/// copy-pasted into a time-reporting tool.
+private class DaySummaryView: NSView {
+    static let minHeight: CGFloat = 72
+    static let maxHeight: CGFloat = 220
+
+    /// Per-day project totals. Parallel to the 7 day columns.
+    private var dayTotals: [[ProjectDuration]] = Array(repeating: [], count: 7)
+    private var dates: [Date] = []
+
+    private let rowH: CGFloat = 19
+    private let rowSpacing: CGFloat = 3
+    private let topPadding: CGFloat = 6
+    private let totalRowH: CGFloat = 20
+    private let totalGap: CGFloat = 4
+    private let sidePadding: CGFloat = 5
+
+    override var isFlipped: Bool { true }
+
+    func update(columns: [DayColumnData], now: Date) {
+        dates = columns.map { $0.date }
+        dayTotals = columns.map { col in
+            let firstOn = col.visualSpans.first?.start
+            return TimeCalculations.dailyProjectTotals(
+                spans: col.logicalSpans,
+                entries: col.projects,
+                firstOnTime: firstOn,
+                now: now
+            ).filter { !$0.project.hasPrefix("~") }
+        }
+    }
+
+    /// Height needed to show every project for the week without clipping,
+    /// clamped so the timeline below never disappears.
+    func preferredHeight() -> CGFloat {
+        let maxRows = dayTotals.map(\.count).max() ?? 0
+        guard maxRows > 0 else { return Self.minHeight }
+        let projectsArea = CGFloat(maxRows) * rowH + CGFloat(max(0, maxRows - 1)) * rowSpacing
+        let needed = topPadding + projectsArea + totalGap + totalRowH + 4
+        return min(Self.maxHeight, max(Self.minHeight, needed))
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        dirtyRect.fill()
+
+        let colW = (bounds.width - timeColW) / 7
+        guard colW > 0 else { return }
+
+        // Left gutter label ("hours") so the column is never unexplained
+        let gutterAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 9, weight: .medium),
+            .foregroundColor: NSColor.tertiaryLabelColor
+        ]
+        let gutterStr = NSAttributedString(string: "hours", attributes: gutterAttrs)
+        let gsz = gutterStr.size()
+        gutterStr.draw(at: NSPoint(
+            x: timeColW - gsz.width - 5,
+            y: topPadding + 2
+        ))
+
+        let totalRowY = bounds.height - totalRowH - 2
+
+        for i in 0..<7 {
+            let x = timeColW + CGFloat(i) * colW
+            let isToday = i < dates.count && cal.isDateInToday(dates[i])
+
+            if isToday {
+                NSColor.controlAccentColor.withAlphaComponent(0.06).setFill()
+                NSRect(x: x, y: 0, width: colW, height: bounds.height).fill()
+            }
+
+            // Column separator (matches the header/timeline)
+            NSColor.separatorColor.withAlphaComponent(0.18).setFill()
+            NSRect(x: x, y: 4, width: 0.5, height: bounds.height - 8).fill()
+
+            let totals = i < dayTotals.count ? dayTotals[i] : []
+            drawPills(in: CGRect(x: x + sidePadding,
+                                 y: topPadding,
+                                 width: colW - sidePadding * 2,
+                                 height: totalRowY - totalGap - topPadding),
+                     totals: totals)
+
+            let grandTotal = totals.reduce(0.0) { $0 + $1.duration }
+            drawDayTotal(in: CGRect(x: x, y: totalRowY, width: colW, height: totalRowH),
+                        seconds: grandTotal,
+                        isToday: isToday)
+        }
+
+        // Divider above total row (subtle rule tying all day totals together)
+        NSColor.separatorColor.withAlphaComponent(0.25).setFill()
+        NSRect(x: timeColW, y: totalRowY - 1, width: bounds.width - timeColW, height: 0.5).fill()
+
+        // Bottom separator aligning with the scroll view
+        NSColor.separatorColor.setFill()
+        NSRect(x: 0, y: bounds.height - 0.5, width: bounds.width, height: 0.5).fill()
+    }
+
+    private func drawPills(in rect: CGRect, totals: [ProjectDuration]) {
+        guard !totals.isEmpty else { return }
+
+        let availableH = rect.height
+        // How many pills actually fit?
+        var maxFit = 0
+        var used: CGFloat = 0
+        for _ in totals {
+            let next = used + (maxFit == 0 ? rowH : rowH + rowSpacing)
+            if next > availableH { break }
+            used = next
+            maxFit += 1
+        }
+        if maxFit == 0 { return }
+
+        let overflow = totals.count - maxFit
+        // If truncating, reserve the last slot for an overflow indicator.
+        let pillsToShow = overflow > 0 ? max(0, maxFit - 1) : maxFit
+
+        var y = rect.minY
+        for i in 0..<pillsToShow {
+            drawPill(CGRect(x: rect.minX, y: y, width: rect.width, height: rowH),
+                    project: totals[i].project,
+                    seconds: totals[i].duration)
+            y += rowH + rowSpacing
+        }
+
+        if overflow > 0 {
+            // +N more, with the summed hours — still useful for reporting
+            let rest = totals.dropFirst(pillsToShow).reduce(0.0) { $0 + $1.duration }
+            drawOverflowPill(
+                CGRect(x: rect.minX, y: y, width: rect.width, height: rowH),
+                count: totals.count - pillsToShow,
+                seconds: rest
+            )
+        }
+    }
+
+    private func drawPill(_ rect: CGRect, project: String, seconds: TimeInterval) {
+        let color = projectColor(project)
+        color.withAlphaComponent(0.45).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).fill()
+        color.withAlphaComponent(0.75).setStroke()
+        let border = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+        border.lineWidth = 0.5
+        border.stroke()
+
+        let hoursAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .semibold),
+            .foregroundColor: NSColor.labelColor
+        ]
+        let hoursStr = NSAttributedString(string: decimalHours(seconds), attributes: hoursAttrs)
+        let hsz = hoursStr.size()
+        hoursStr.draw(at: NSPoint(
+            x: rect.maxX - hsz.width - 5,
+            y: rect.minY + (rect.height - hsz.height) / 2 - 0.5
+        ))
+
+        let label = project == "Break" ? "⏸ Break" : project
+        let nameAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10.5, weight: .medium),
+            .foregroundColor: NSColor.labelColor.withAlphaComponent(0.9)
+        ]
+        let nameStr = NSAttributedString(string: label, attributes: nameAttrs)
+        let nameMaxX = rect.maxX - hsz.width - 10
+        let nameRect = CGRect(x: rect.minX + 6,
+                              y: rect.minY,
+                              width: max(0, nameMaxX - rect.minX - 6),
+                              height: rect.height)
+
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: nameRect).setClip()
+        nameStr.draw(at: NSPoint(
+            x: nameRect.minX,
+            y: rect.minY + (rect.height - nameStr.size().height) / 2 - 0.5
+        ))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private func drawOverflowPill(_ rect: CGRect, count: Int, seconds: TimeInterval) {
+        NSColor.labelColor.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).fill()
+
+        let text = "+\(count) more · \(decimalHours(seconds))"
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        let str = NSAttributedString(string: text, attributes: attrs)
+        let sz = str.size()
+        str.draw(at: NSPoint(
+            x: rect.minX + (rect.width - sz.width) / 2,
+            y: rect.minY + (rect.height - sz.height) / 2 - 0.5
+        ))
+    }
+
+    private func drawDayTotal(in rect: CGRect, seconds: TimeInterval, isToday: Bool) {
+        guard seconds > 0 else {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .regular),
+                .foregroundColor: NSColor.quaternaryLabelColor
+            ]
+            let dash = NSAttributedString(string: "—", attributes: attrs)
+            let sz = dash.size()
+            dash.draw(at: NSPoint(
+                x: rect.minX + (rect.width - sz.width) / 2,
+                y: rect.minY + (rect.height - sz.height) / 2
+            ))
+            return
+        }
+
+        let text = decimalHours(seconds) + "h"
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .bold),
+            .foregroundColor: isToday ? NSColor.controlAccentColor : NSColor.labelColor
+        ]
+        let str = NSAttributedString(string: text, attributes: attrs)
+        let sz = str.size()
+        str.draw(at: NSPoint(
+            x: rect.minX + (rect.width - sz.width) / 2,
+            y: rect.minY + (rect.height - sz.height) / 2
+        ))
     }
 }
 
