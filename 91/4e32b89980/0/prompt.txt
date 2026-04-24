@@ -1,0 +1,82 @@
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+---
+
+build and restart please
+
+---
+
+Ah. Position the text above the "Fri 24" not at hour 0:00. I can't read that. And, of course, it will need to be one line per project
+
+---
+
+Naah, something's messed up. The process starts but no longer shows up in the menu bar
+
+---
+
+Still doesn't show up
+
+---
+
+something jiggles the rest of the menu bar items for a split second but then disappears.
+
+---
+
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+---
+
+Look at the weekly view. 
+At the top of each day, add a summary of hour many hours (in decimal format) I've spent on each project.
+
+Be clever about this. I like it pretty. It should be visible on the first load of the page (no scroling to see it). I'll be using this to report time in my time reporting tool
+
+---
+
+Build and restart it for me please
+
+---
+
+Grrr. For some reasone the app doesn't start.
+
+This has happened before. I see the other menubar icons jiggle, as if a new one is about to appear, but then a split second later they settle back and no new icon appears. =(
+
+What could that be about?
+
+---
+
+I cannot see the app. Both screens have the menu bar though the 4k screen is main. 
+
+Nuke please
+
+---
+
+I can't see the icon- I only have like 5, so there's plenty of space before the notch
+
+In Tahoe, I can't see the Control Center you speak of. 
+
+There's a Menu Bar which has a "Allow in the menu bar" list. That list contains a "BarTimeTracker copy" (I copied the app to see if just changing the name would fix it) but not "BarTimeTracker"
+
+---
+
+No dialog =(
+
+---
+
+/btw - the BarTimeTracker Copy doesn't show in the menu bar either. Just for reference.
+
+---
+
+Should I just restart my computer?
+
+---
+
+Should I just restart my computer?
+
+---
+
+Still nothing. 
+
+Can you make sure the app starts and open a welcome dialog for me at start?
