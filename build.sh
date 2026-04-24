@@ -26,5 +26,14 @@ swiftc Sources/BarTimeTrackerCore/TimeCalculations.swift \
 echo "Copying Info.plist..."
 cp Info.plist "$APP/Contents/Info.plist"
 
+# Ad-hoc sign the whole bundle AFTER Info.plist is in place so CFBundleIdentifier
+# is bound into the signature. Without this the linker-signed default leaves
+# Info.plist unbound, so every rebuild looks like a new app to macOS (Tahoe+)
+# and its menubar "Allow" entry goes stale — the status item registers for a
+# split second then gets hidden.
+echo "Ad-hoc signing bundle..."
+codesign --force --sign - --identifier com.user.BarTimeTracker "$APP"
+codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature|Info\.plist|Sealed"
+
 echo "Done. Run with:"
 echo "  open $APP"

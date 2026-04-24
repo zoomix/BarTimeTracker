@@ -74,6 +74,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("BarTimeTracker: applicationDidFinishLaunching START pid=\(ProcessInfo.processInfo.processIdentifier)")
+
         let data = loadData()
         currentProject = data.projectEntries.last?.project ?? ""
 
@@ -85,6 +87,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         setupFocusMonitoring()
         recordScreenEvent(.on)
         scheduleProjectTimer()
+
+        // Diagnostic: prove the GUI is alive. Any menubar issues happen around
+        // setupStatusItem above; if this dialog appears, the app itself is fine
+        // and we know the problem is purely with NSStatusItem visibility.
+        DispatchQueue.main.async {
+            let btn = self.statusItem?.button
+            let btnW = btn?.frame.width ?? -1
+            let visible = self.statusItem?.isVisible ?? false
+            let img = btn?.image != nil
+            let title = btn?.title ?? ""
+            NSLog("BarTimeTracker: statusItem isVisible=\(visible) button=\(btn != nil) buttonW=\(btnW) hasImage=\(img) title=\"\(title)\"")
+
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = "BarTimeTracker is running"
+            alert.informativeText = """
+            PID \(ProcessInfo.processInfo.processIdentifier)
+            Status item visible: \(visible)
+            Button width: \(String(format: "%.1f", btnW))
+            Has image: \(img), title: "\(title)"
+
+            If you don't see the ⏱ icon in the menu bar, the status item \
+            is being suppressed by macOS despite being created.
+            """
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 
     // MARK: - Screen Events
@@ -201,8 +230,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
 
     func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // autosaveName + explicit isVisible reclaims the slot even if the user
+        // previously Cmd-dragged the icon off the menubar (macOS Sonoma+).
+        statusItem.autosaveName = "BarTimeTracker.statusItem"
+        statusItem.isVisible = true
+        statusItem.behavior = []
+
         if let button = statusItem.button {
-            button.title = "⏱"
+            // SF Symbol renders more compactly than an emoji and survives
+            // menubar-overflow collapsing better.
+            if let img = NSImage(systemSymbolName: "timer", accessibilityDescription: "BarTimeTracker") {
+                img.isTemplate = true
+                button.image = img
+                button.imagePosition = .imageOnly
+            } else {
+                button.title = "⏱"
+            }
             button.action = #selector(showMenu)
             button.target = self
         }
