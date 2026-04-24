@@ -85,6 +85,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         setupFocusMonitoring()
         recordScreenEvent(.on)
         scheduleProjectTimer()
+        DispatchQueue.main.async { [weak self] in
+            self?.openWeekView()
+        }
     }
 
     // MARK: - Screen Events
@@ -626,6 +629,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             weekTimelineWindow = WeekTimelineWindow(dataStore: self)
         }
         weekTimelineWindow?.refresh()
+        weekTimelineWindow?.center()
         weekTimelineWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
