@@ -32,7 +32,7 @@ cp Info.plist "$APP/Contents/Info.plist"
 # and its menubar "Allow" entry goes stale — the status item registers for a
 # split second then gets hidden.
 echo "Ad-hoc signing bundle..."
-codesign --force --sign - --identifier com.user.BarTimeTracker "$APP"
+codesign --force --sign - --identifier com.user.BarTimeTrackerFresh "$APP"
 codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature|Info\.plist|Sealed"
 
 echo "Done. Run with:"
