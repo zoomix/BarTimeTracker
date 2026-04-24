@@ -1,0 +1,7 @@
+Check out the weekly view. 
+
+Change the colors to be more friendly towards us who are red/green colorblind
+
+---
+
+Build and restart it for me
