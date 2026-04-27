@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.5.5",
+  "checkpoint_id": "8eb74f781b3f",
+  "session_id": "543b59ad-5eb6-48a7-893f-011e09cf109b",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-27T11:23:39.895784Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift"
+  ],
+  "agent": "Claude Code",
+  "model": "gpt-5.4",
+  "turn_id": "a7c70381f156",
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-27T11:23:39.892989Z",
+    "agent_lines": 12,
+    "agent_removed": 5,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 12,
+    "total_lines_changed": 17,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 12,
+      "agent_lines_removed": 5
+    }
+  ]
+}

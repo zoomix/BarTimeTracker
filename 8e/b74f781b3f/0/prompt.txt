@@ -1,0 +1,9 @@
+Need to fix one thing.
+
+If I've reported at 11:50 that I'm woking on Project A
+and then my screensaver goes on at 12:00 because I went to lunch
+When I come back at 13 - it's gonna ask me where I was, I will say "break", but now - that propagates all the way up to 11:50 instead of 12:00 when I went away
+
+---
+
+Huh. That's great, but isn't it odd that the tests could not discover this fault at all? It feels like the tests should have failed once you made this change or was the calculation always correct?
