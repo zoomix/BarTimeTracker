@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     var nextPromptDate: Date?
     var promptInterval: TimeInterval = 15 * 60
     var screensaverStartTime: Date?
+    var pendingPromptEntryTime: Date?
 
     let intervalKey = "promptInterval"
     let logoutDateKey = "logoutDate"
@@ -111,7 +112,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         if projectTimer == nil { scheduleProjectTimer() }
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
-        if sinceLastPrompt > promptInterval { askForProject(isAutoPrompt: true) }
+        if sinceLastPrompt > promptInterval {
+            pendingPromptEntryTime = loadData().screenEvents.last(where: { $0.kind.isAway })?.time
+            askForProject(isAutoPrompt: true)
+        }
     }
     @objc func screenSlept() {
         screensaverStartTime = nil  // lid-close voids any pending screensaver absence
@@ -127,6 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
             if absence > 60 {
+                pendingPromptEntryTime = start
                 // Delay slightly — screen layout isn't stable the instant the screensaver ends
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.askForProject(isAutoPrompt: true)
@@ -172,9 +177,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
 
     // MARK: - Project Entries
 
-    func recordProjectEntry(_ project: String) {
+    func recordProjectEntry(_ project: String, at time: Date = Date()) {
         var data = loadData()
-        data.projectEntries.append(ProjectEntry(project: project, time: Date()))
+        data.projectEntries.append(ProjectEntry(project: project, time: time))
         saveData(data)
         scheduleProjectTimer()
     }
@@ -456,20 +461,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 recentProjects: self.recentProjects()
             )
             self.promptWindow = window
+            let entryTime = self.pendingPromptEntryTime ?? Date()
 
             window.onSave = { [weak self] val in
                 guard let self else { return }
                 self.currentProject = val
-                self.recordProjectEntry(val)
+                self.recordProjectEntry(val, at: entryTime)
             }
 
             window.onBreak = { [weak self] in
                 guard let self else { return }
-                self.recordProjectEntry("Break")
+                self.recordProjectEntry("Break", at: entryTime)
             }
 
             window.onDismiss = { [weak self] in
                 guard let self else { return }
+                self.pendingPromptEntryTime = nil
                 self.promptWindow = nil
                 if isAutoPrompt { self.scheduleProjectTimer() }
             }
