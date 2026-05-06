@@ -6,8 +6,12 @@ import BarTimeTrackerCore
 #endif
 
 class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
+    static let heartbeatStaleThreshold: TimeInterval = 10 * 60
+    static let heartbeatInterval: TimeInterval = 30
+
     var statusItem: NSStatusItem!
     var projectTimer: Timer?
+    var heartbeatTimer: Timer?
     var currentProject: String = ""
     var promptWindow: ProjectPromptWindow?
     var weekTimelineWindow: WeekTimelineWindow?
@@ -40,6 +44,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         let dir = base.appendingPathComponent("BarTimeTracker")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("events.json")
+    }()
+
+    lazy var heartbeatFileURL: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = base.appendingPathComponent("BarTimeTracker")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("heartbeat")
     }()
 
     let encoder: JSONEncoder = {
@@ -84,6 +95,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         setupStatusItem()
         setupScreenMonitoring()
         setupFocusMonitoring()
+        handleStaleHeartbeat()
+        setupHeartbeat()
         recordScreenEvent(.on)
         scheduleProjectTimer()
         DispatchQueue.main.async { [weak self] in
@@ -138,6 +151,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 }
             }
         }
+    }
+
+    // MARK: - Heartbeat
+
+    func setupHeartbeat() {
+        recordHeartbeat()
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: AppDelegate.heartbeatInterval, repeats: true) { [weak self] _ in
+            self?.recordHeartbeat()
+        }
+        RunLoop.main.add(heartbeatTimer!, forMode: .common)
+    }
+
+    private func recordHeartbeat() {
+        try? "\(Date().timeIntervalSince1970)".data(using: .utf8)?.write(to: heartbeatFileURL, options: .atomic)
+    }
+
+    private func handleStaleHeartbeat() {
+        guard let data = try? Data(contentsOf: heartbeatFileURL),
+              let timeStr = String(data: data, encoding: .utf8),
+              let lastHeartbeatTime = TimeInterval(timeStr) else {
+            return
+        }
+        let lastHeartbeat = Date(timeIntervalSince1970: lastHeartbeatTime)
+
+        let threshold = AppDelegate.heartbeatStaleThreshold
+        let age = Date().timeIntervalSince(lastHeartbeat)
+
+        guard age > threshold else { return }
+
+        let appData = loadData()
+        let todayEvents = appData.screenEvents.filter { Calendar.current.isDateInToday($0.time) }
+        guard let last = todayEvents.last,
+              (last.kind == .on || last.kind == .screensaverOff),
+              age > threshold else {
+            return
+        }
+
+        recordScreenEvent(.off)
     }
 
     func recordScreenEvent(_ kind: ScreenEvent.Kind) {
