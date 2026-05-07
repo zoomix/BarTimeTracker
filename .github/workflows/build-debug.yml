@@ -7,44 +7,58 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-13
-            arch: x86_64
-          - os: macos-latest
-            arch: arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build .app
+      - name: Build fat universal app
         run: |
-          APP="BarTimeTracker-debug-${{ matrix.arch }}.app"
+          APP="BarTimeTracker.app"
           BINARY_DIR="$APP/Contents/MacOS"
           mkdir -p "$BINARY_DIR"
 
+          # Build x86_64 slice
           swiftc \
             Sources/BarTimeTrackerCore/TimeCalculations.swift \
             Sources/BarTimeTracker/main.swift \
             Sources/BarTimeTracker/AppDelegate.swift \
             Sources/BarTimeTracker/ProjectPromptWindow.swift \
             Sources/BarTimeTracker/WeekTimelineWindow.swift \
+            -target x86_64-apple-macosx13.0 \
+            -o "$BINARY_DIR/bar" \
             -framework AppKit \
             -framework Foundation \
-            -framework IOKit \
-            -o "$BINARY_DIR/BarTimeTracker"
+            -framework IOKit
 
+          # Build arm64 slice
+          swiftc \
+            Sources/BarTimeTrackerCore/TimeCalculations.swift \
+            Sources/BarTimeTracker/main.swift \
+            Sources/BarTimeTracker/AppDelegate.swift \
+            Sources/BarTimeTracker/ProjectPromptWindow.swift \
+            Sources/BarTimeTracker/WeekTimelineWindow.swift \
+            -target arm64-apple-macosx13.0 \
+            -o "$BINARY_DIR/arm64" \
+            -framework AppKit \
+            -framework Foundation \
+            -framework IOKit
+
+          # Combine into universal binary
+          lipo -create "$BINARY_DIR/bar" "$BINARY_DIR/arm64" \
+            -output "$BINARY_DIR/BarTimeTracker"
+          rm "$BINARY_DIR/bar" "$BINARY_DIR/arm64"
+
+          # Set up app bundle
           cp Info.plist "$APP/Contents/"
 
+          # Ad-hoc sign the bundle
           codesign --force --sign - \
-            --identifier com.user.BarTimeTrackerF.Debug.${{ matrix.arch }} \
+            --identifier com.user.BarTimeTrackerF.Debug \
             "$APP"
 
-      - name: Upload artifact
+      - name: Upload universal app
         uses: actions/upload-artifact@v4
         with:
-          name: BarTimeTracker-debug-${{ matrix.arch }}.app
-          path: BarTimeTracker-debug-${{ matrix.arch }}.app
+          name: BarTimeTracker.app
+          path: BarTimeTracker.app
           retention-days: 30
