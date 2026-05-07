@@ -156,9 +156,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     // MARK: - Heartbeat
 
     func setupHeartbeat() {
-        recordHeartbeat()
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: AppDelegate.heartbeatInterval, repeats: true) { [weak self] _ in
-            self?.recordHeartbeat()
+            guard let self else { return }
+            self.handleStaleHeartbeat()
+            self.recordHeartbeat()
         }
         RunLoop.main.add(heartbeatTimer!, forMode: .common)
     }
