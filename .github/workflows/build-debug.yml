@@ -31,7 +31,6 @@ jobs:
             Sources/BarTimeTracker/AppDelegate.swift \
             Sources/BarTimeTracker/ProjectPromptWindow.swift \
             Sources/BarTimeTracker/WeekTimelineWindow.swift \
-            -arch ${{ matrix.arch }} \
             -framework AppKit \
             -framework Foundation \
             -framework IOKit \
