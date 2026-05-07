@@ -1,0 +1,51 @@
+name: Build Debug App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            arch: x86_64
+          - os: macos-latest
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .app
+        run: |
+          APP="BarTimeTracker-debug-${{ matrix.arch }}.app"
+          BINARY_DIR="$APP/Contents/MacOS"
+          mkdir -p "$BINARY_DIR"
+
+          swiftc \
+            Sources/BarTimeTrackerCore/TimeCalculations.swift \
+            Sources/BarTimeTracker/main.swift \
+            Sources/BarTimeTracker/AppDelegate.swift \
+            Sources/BarTimeTracker/ProjectPromptWindow.swift \
+            Sources/BarTimeTracker/WeekTimelineWindow.swift \
+            -arch ${{ matrix.arch }} \
+            -framework AppKit \
+            -framework Foundation \
+            -framework IOKit \
+            -o "$BINARY_DIR/BarTimeTracker"
+
+          cp Info.plist "$APP/Contents/"
+
+          codesign --force --sign - \
+            --identifier com.user.BarTimeTrackerF.Debug.${{ matrix.arch }} \
+            "$APP"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BarTimeTracker-debug-${{ matrix.arch }}.app
+          path: BarTimeTracker-debug-${{ matrix.arch }}.app
+          retention-days: 30
