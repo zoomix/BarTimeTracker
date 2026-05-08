@@ -189,14 +189,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             return
         }
 
-        recordScreenEvent(.off)
+        recordScreenEvent(.off, at: lastHeartbeat)
+        recordScreenEvent(.on)
     }
 
-    func recordScreenEvent(_ kind: ScreenEvent.Kind) {
+    func recordScreenEvent(_ kind: ScreenEvent.Kind, at time: Date = Date()) {
         var data = loadData()
         let todayEvents = data.screenEvents.filter { Calendar.current.isDateInToday($0.time) }
         if let last = todayEvents.last, last.kind == kind { return }
-        data.screenEvents.append(ScreenEvent(kind: kind, time: Date()))
+        data.screenEvents.append(ScreenEvent(kind: kind, time: time))
         saveData(data)
     }
 
