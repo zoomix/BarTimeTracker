@@ -1,0 +1,27 @@
+<ide_selection>The user selected the lines 171 to 193 from /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift:
+    private func handleStaleHeartbeat() {
+        guard let data = try? Data(contentsOf: heartbeatFileURL),
+              let timeStr = String(data: data, encoding: .utf8),
+              let lastHeartbeatTime = TimeInterval(timeStr) else {
+            return
+        }
+        let lastHeartbeat = Date(timeIntervalSince1970: lastHeartbeatTime)
+
+        let threshold = AppDelegate.heartbeatStaleThreshold
+        let age = Date().timeIntervalSince(lastHeartbeat)
+
+        guard age > threshold else { return }
+
+        let appData = loadData()
+        let todayEvents = appData.screenEvents.filter { Calendar.current.isDateInToday($0.time) }
+        guard let last = todayEvents.last,
+              (last.kind == .on || last.kind == .screensaverOff),
+              age > threshold else {
+            return
+        }
+
+        recordScreenEvent(.off)
+    }
+
+This may or may not be related to the current task.</ide_selection>
+If age > threadhosl this method should record two events. An "off" event at the time of the old heartbean and an "on" event at the current timestamp
