@@ -181,14 +181,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
 
         guard age > threshold else { return }
 
-        let appData = loadData()
-        let todayEvents = appData.screenEvents.filter { Calendar.current.isDateInToday($0.time) }
-        guard let last = todayEvents.last,
-              (last.kind == .on || last.kind == .screensaverOff),
-              age > threshold else {
-            return
-        }
-
         recordScreenEvent(.off, at: lastHeartbeat)
         recordScreenEvent(.on)
     }
