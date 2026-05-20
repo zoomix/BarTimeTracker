@@ -1,0 +1,10 @@
+<ide_selection>The user selected the lines 443 to 443 from /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift:
+        recordProjectEntry("~logged out~")
+
+This may or may not be related to the current task.</ide_selection>
+If we're logged out of the day and I come back to the computer, you should not ask me what I was up to. I'm logged out for the day. kthxbai
+
+---
+
+<ide_opened_file>The user opened the file /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift in the IDE. This may or may not be related to the current task.</ide_opened_file>
+No, you're not thinking this through. If i'm logged out for the day, that doesn't mean you should not ask me the following day -
