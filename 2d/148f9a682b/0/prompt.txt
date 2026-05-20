@@ -1,0 +1,7 @@
+<ide_selection>The user selected the lines 516 to 516 from /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift:
+recordProjectEntry
+
+This may or may not be related to the current task.</ide_selection>
+The mac will wake up every once in a while to check .. god knows what. This happens when I'm not around, yet it registers a screen-on/off. 
+
+It's.. whatever. Can we just not render these?
