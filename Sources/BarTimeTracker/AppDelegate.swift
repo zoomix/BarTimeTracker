@@ -393,6 +393,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         } else {
             for span in spans {
                 let spanEnd = span.end ?? Date()
+                guard Int(spanEnd.timeIntervalSince(span.start) / 60) > 0 else { continue }
                 let startStr = timeFmt.string(from: span.start)
                 let endStr   = span.isActive ? "now" : timeFmt.string(from: span.end!)
                 let dur      = formatDuration(spanEnd.timeIntervalSince(span.start))
