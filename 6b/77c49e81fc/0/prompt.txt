@@ -1,0 +1,22 @@
+<ide_selection>The user selected the lines 123 to 133 from /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift:
+    @objc func screenWoke() {
+        recordScreenEvent(.on)
+        if projectTimer == nil { scheduleProjectTimer() }
+        guard !isLoggedOut else { return }
+        // Prompt on lid-open return if absent long enough (screensaver path handles its own)
+        let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
+        if sinceLastPrompt > promptInterval {
+            pendingPromptEntryTime = loadData().screenEvents.last(where: { $0.kind.isAway })?.time
+            askForProject(isAutoPrompt: true)
+        }
+    }
+
+This may or may not be related to the current task.</ide_selection>
+This is another pet pieve. When I come back from being away, it records the time at the time I went away. That's not what's supposed to happen.
+
+Look at this scenario
+t=10:00. User works on Project A
+t=10:10. Screensaver trigger - user if AFK
+t=10:30. Screensaver shuts of. User is back. Popup appears. User clicks break
+
+What I want to happen is I want to copy the last project (project A registered at 10:00) and write that at the time screen went off (isAway, in this ca 10:10). When the user says they were on a "break" that means only the time from 10:10 to 10:30
