@@ -127,16 +127,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
         if sinceLastPrompt > promptInterval {
-            pendingPromptEntryTime = loadData().screenEvents.last(where: { $0.kind.isAway })?.time
+            pendingPromptEntryTime = nil  // record at return time, not away time
             askForProject(isAutoPrompt: true)
         }
     }
     @objc func screenSlept() {
         screensaverStartTime = nil  // lid-close voids any pending screensaver absence
+        if !currentProject.isEmpty { recordProjectEntry(currentProject) }  // stamp current project at sleep time
         recordScreenEvent(.off)
     }
     @objc func screensaverStarted() {
-        screensaverStartTime = Date()
+        let now = Date()
+        screensaverStartTime = now
+        if !currentProject.isEmpty { recordProjectEntry(currentProject, at: now) }  // stamp current project at screensaver start
         recordScreenEvent(.screensaverOn)
     }
     @objc func screensaverStopped() {
@@ -146,7 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
             if absence > 60 {
-                pendingPromptEntryTime = start
+                pendingPromptEntryTime = nil  // record at return time, not away time
                 // Delay slightly — screen layout isn't stable the instant the screensaver ends
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.askForProject(isAutoPrompt: true)
