@@ -123,6 +123,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     @objc func screenWoke() {
         recordScreenEvent(.on)
         if projectTimer == nil { scheduleProjectTimer() }
+        guard !isLoggedOut else { return }
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
         if sinceLastPrompt > promptInterval {
@@ -140,6 +141,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     }
     @objc func screensaverStopped() {
         recordScreenEvent(.screensaverOff)
+        guard !isLoggedOut else { screensaverStartTime = nil; return }
         if let start = screensaverStartTime {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
