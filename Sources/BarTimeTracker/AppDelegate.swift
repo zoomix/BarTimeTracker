@@ -132,8 +132,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         }
     }
     @objc func screenSlept() {
-        screensaverStartTime = nil  // lid-close voids any pending screensaver absence
-        if !currentProject.isEmpty { recordProjectEntry(currentProject) }  // stamp current project at sleep time
+        let screensaverWasRunning = screensaverStartTime != nil
+        screensaverStartTime = nil
+        // Only stamp if screensaver wasn't already running — screensaverStarted already closed the work window
+        if !screensaverWasRunning && !currentProject.isEmpty { recordProjectEntry(currentProject) }
         recordScreenEvent(.off)
     }
     @objc func screensaverStarted() {
@@ -522,6 +524,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
 
             window.onBreak = { [weak self] in
                 guard let self else { return }
+                self.currentProject = "Break"
                 self.recordProjectEntry("Break", at: entryTime)
             }
 
