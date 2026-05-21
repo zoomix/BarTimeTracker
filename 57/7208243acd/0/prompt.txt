@@ -1,0 +1,14 @@
+<ide_selection>The user selected the lines 134 to 134 from /Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift:
+screenSlept
+
+This may or may not be related to the current task.</ide_selection>
+Something else is off. Look at 2026-05-20 in this events file.
+
+I came back to the computer at 15:59
+Then I worked until 16:27 when the screensaver went on. Then the computer went to sleep. 
+
+Looking at the entries, it looks as though I worked throughout the screen-saver time, which I way didn't. 
+
+Then, 2026-05-21 rolls allong and the computer wakes up at 00:08. That marks the time as Break" and from that point on - for whatever reason it thinks I'm working on apps.qamcom.se. 
+
+I got a notification when I came back and it said what I was up to, and I'm pretty sure i pressed Break
