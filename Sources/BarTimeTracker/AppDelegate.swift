@@ -20,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     var nextPromptDate: Date?
     var promptInterval: TimeInterval = 15 * 60
     var screensaverStartTime: Date?
+    var screenSleepTime: Date?
     var pendingPromptEntryTime: Date?
 
     let intervalKey = "promptInterval"
@@ -127,12 +128,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
         if sinceLastPrompt > promptInterval {
-            pendingPromptEntryTime = nil  // record at return time, not away time
+            pendingPromptEntryTime = screenSleepTime
             askForProject(isAutoPrompt: true)
         }
     }
     @objc func screenSlept() {
         let screensaverWasRunning = screensaverStartTime != nil
+        // If screensaver was running, use its start time as the effective departure (work window already closed then)
+        screenSleepTime = screensaverStartTime ?? Date()
         screensaverStartTime = nil
         // Only stamp if screensaver wasn't already running — screensaverStarted already closed the work window
         if !screensaverWasRunning && !currentProject.isEmpty { recordProjectEntry(currentProject) }
@@ -151,7 +154,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
             if absence > 60 {
-                pendingPromptEntryTime = nil  // record at return time, not away time
+                pendingPromptEntryTime = start
                 // Delay slightly — screen layout isn't stable the instant the screensaver ends
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.askForProject(isAutoPrompt: true)
@@ -514,18 +517,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 recentProjects: self.recentProjects()
             )
             self.promptWindow = window
-            let entryTime = self.pendingPromptEntryTime ?? Date()
+            let awayTime = self.pendingPromptEntryTime  // when user left — nil if manually triggered
+            let returnTime = Date()
 
             window.onSave = { [weak self] val in
                 guard let self else { return }
                 self.currentProject = val
-                self.recordProjectEntry(val, at: entryTime)
+                self.recordProjectEntry(val, at: returnTime)  // project starts at return, not departure
             }
 
             window.onBreak = { [weak self] in
                 guard let self else { return }
                 self.currentProject = "Break"
-                self.recordProjectEntry("Break", at: entryTime)
+                self.recordProjectEntry("Break", at: awayTime ?? returnTime)  // break covers the absence
             }
 
             window.onDismiss = { [weak self] in
