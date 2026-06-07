@@ -1,9 +1,7 @@
 import AppKit
 import Foundation
 import IOKit.pwr_mgt
-#if canImport(BarTimeTrackerCore)
 import BarTimeTrackerCore
-#endif
 
 class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     static let heartbeatStaleThreshold: TimeInterval = 10 * 60
