@@ -16,7 +16,6 @@ extension EventLogCalculationTests {
     2026-05-29,07:05:00,entry,user,Librixer
     2026-05-29,07:05:00,screensaverOn,computer,-
     2026-05-29,07:20:00,screensaverOff,computer,-
-    2026-05-29,07:05:00,entry,user,Break
     2026-05-29,07:25:00,entry,user,Break
     2026-05-29,07:25:00,off,computer,-
     2026-05-29,07:40:00,on,computer,-
@@ -101,12 +100,12 @@ extension EventLogCalculationTests {
         }.joined(separator: "\n")
         XCTAssertEqual(actual, """
             06:35 - 07:05  Librixer
-            07:20 - 08:15  Break
-            07:55 - 08:55  apps.qamcom.se
+            07:05 - 08:15  Break
+            08:15 - 08:55  apps.qamcom.se
             08:55 - 10:20  Librixer
-            10:20 - 10:35  decarb
-            10:35 - 12:40  Stena sälj
-            12:40 - 13:35  Librixer
+            10:20 - 10:50  decarb
+            10:50 - 12:45  Stena sälj
+            12:45 - 13:35  Librixer
             13:35 - 16:40  apps.qamcom.se
             16:40 - 23:30  Break
             """.trimmingCharacters(in: .whitespacesAndNewlines))

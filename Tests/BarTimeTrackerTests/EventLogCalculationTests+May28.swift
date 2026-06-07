@@ -1,4 +1,5 @@
 import XCTest
+@testable import BarTimeTrackerCore
 
 // May 28 — short afternoon session: Librixer only, then a break-only evening span.
 // Expected: 2 spans (both closed), 54m 38s worked, Librixer 54m 38s.
@@ -25,6 +26,27 @@ extension EventLogCalculationTests {
 
     func test_may28_spanCount() {
         XCTAssertEqual(analyze(csv: Self.csv_may28, now: Self.now_may28).spans.count, 2)
+    }
+
+    func test_may28_spans() {
+        let result = analyze(csv: Self.csv_may28, now: Self.now_may28)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        fmt.timeZone = Self.tz
+        let actual = result.spans.map { s in
+            let start = fmt.string(from: s.start)
+            let end = s.end.map { fmt.string(from: $0) } ?? "?"
+            let durations = TimeCalculations.projectDurations(
+                entries: result.entries, firstOnTime: result.firstOn,
+                spanStart: s.start, spanEnd: s.end ?? Self.now_may28
+            )
+            let project = durations.first?.project ?? "-"
+            return "\(start) - \(end)  \(project)"
+        }.joined(separator: "\n")
+        XCTAssertEqual(actual, """
+            16:00 - 17:00  Librixer
+            17:00 - 20:40  Break
+            """.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     func test_may28_allClosed() {
