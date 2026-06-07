@@ -1,0 +1,46 @@
+Check these two tests out. I've tweaked them manually to fit what I need. They're basically "accurate"
+
+The algorithm that currently generates the answers doesn't work. Can you look into it and see if you can figure out what I mean and how I'd like the algorithm to work?
+
+The tests:
+
+
+Building for debugging...
+[6/6] Linking BarTimeTrackerPackageTests
+Build complete! (1.04s)
+Test Suite 'Selected tests' started at 2026-06-07 16:29:31.740.
+Test Suite 'BarTimeTrackerPackageTests.xctest' started at 2026-06-07 16:29:31.746.
+Test Suite 'EventLogCalculationTests' started at 2026-06-07 16:29:31.747.
+Test Case '-[BarTimeTrackerTests.EventLogCalculationTests test_may28_spans]' started.
+/Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests+May28.swift:46: error: -[BarTimeTrackerTests.EventLogCalculationTests test_may28_spans] : XCTAssertEqual failed: ("16:00 - 17:00  Librixer
+19:40 - 19:45  Break") is not equal to ("16:00 - 17:00  Librixer
+17:00 - 20:40  Break")
+Test Case '-[BarTimeTrackerTests.EventLogCalculationTests test_may28_spans]' failed (0.057 seconds).
+Test Case '-[BarTimeTrackerTests.EventLogCalculationTests test_may29_spans]' started.
+/Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests+May29.swift:101: error: -[BarTimeTrackerTests.EventLogCalculationTests test_may29_spans] : XCTAssertEqual failed: ("06:35 - 07:05  Librixer
+07:20 - 07:25  Break
+07:40 - 07:40  -
+07:55 - 16:40  apps.qamcom.se
+22:35 - 22:35  -
+23:30 - 23:30  -") is not equal to ("06:35 - 07:05  Librixer
+07:05 - 08:15  Break
+08:15 - 08:55  apps.qamcom.se
+08:55 - 10:20  Librixer
+10:20 - 10:50  decarb
+10:50 - 12:45  Stena sälj
+12:45 - 13:35  Librixer
+13:35 - 16:40  apps.qamcom.se
+16:40 - 23:30  Break")
+Test Case '-[BarTimeTrackerTests.EventLogCalculationTests test_may29_spans]' failed (0.003 seconds).
+Test Suite 'EventLogCalculationTests' failed at 2026-06-07 16:29:31.807.
+         Executed 2 tests, with 2 failures (0 unexpected) in 0.060 (0.060) seconds
+Test Suite 'BarTimeTrackerPackageTests.xctest' failed at 2026-06-07 16:29:31.807.
+         Executed 2 tests, with 2 failures (0 unexpected) in 0.060 (0.060) seconds
+Test Suite 'Selected tests' failed at 2026-06-07 16:29:31.807.
+         Executed 2 tests, with 2 failures (0 unexpected) in 0.060 (0.067) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+
+Run the tests as many times as you like

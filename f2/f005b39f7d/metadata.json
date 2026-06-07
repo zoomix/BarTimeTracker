@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.6.2",
+  "checkpoint_id": "f2f005b39f7d",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "Sources/BarTimeTrackerCore/TimeCalculations.swift",
+    "Tests/BarTimeTrackerTests/EventLogCalculationTests+Jun1.swift",
+    "Tests/BarTimeTrackerTests/EventLogCalculationTests+Jun2.swift",
+    "Tests/BarTimeTrackerTests/EventLogCalculationTests+May29.swift",
+    "Tests/BarTimeTrackerTests/TimeCalculatorTests.swift",
+    "memory/MEMORY.md",
+    "memory/project_algorithm_spans.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/f005b39f7d/0/metadata.json",
+      "transcript": "/f2/f005b39f7d/0/full.jsonl",
+      "content_hash": "/f2/f005b39f7d/0/content_hash.txt",
+      "prompt": "/f2/f005b39f7d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 41,
+    "cache_creation_tokens": 161868,
+    "cache_read_tokens": 2762765,
+    "output_tokens": 228136,
+    "api_call_count": 31
+  }
+}
