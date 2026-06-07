@@ -183,7 +183,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr16_spanCount() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr16Events, projectEntries: apr16Projects, now: apr16Now)
-        XCTAssertEqual(spans.count, 5)
+        XCTAssertEqual(spans.count, 13)
     }
 
     func test_apr16_allSpansClosed() {
@@ -278,16 +278,16 @@ final class TimeCalculatorTests: XCTestCase {
     private var apr17Now: Date { Self.d("2026-04-17T15:33:18Z") }
 
     func test_apr17_spanCount() {
-        // All gaps covered by non-Break project entries → everything merges into one span
+        // Each project-group transition creates a new span
         let spans = TimeCalculations.buildTimeSpans(
             from: apr17Events, projectEntries: apr17Projects, now: apr17Now)
-        XCTAssertEqual(spans.count, 1)
+        XCTAssertEqual(spans.count, 7)
     }
 
     func test_apr17_spanIsActive() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr17Events, projectEntries: apr17Projects, now: apr17Now)
-        XCTAssertTrue(spans.first?.isActive ?? false)
+        XCTAssertTrue(spans.last?.isActive ?? false)
     }
 
     func test_apr17_workedTime() {
@@ -342,7 +342,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr19_spanCount() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr19Events, projectEntries: apr19Projects, now: apr19Now)
-        XCTAssertEqual(spans.count, 2)
+        XCTAssertEqual(spans.count, 1)
     }
 
     func test_apr19_workedTime_isZero() {

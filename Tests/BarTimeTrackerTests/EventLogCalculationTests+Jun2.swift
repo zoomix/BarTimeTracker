@@ -92,7 +92,7 @@ extension EventLogCalculationTests {
     """
 
     func test_jun2_spanCount() {
-        XCTAssertEqual(analyze(csv: Self.csv_jun2, now: Self.now_jun2).spans.count, 18)
+        XCTAssertEqual(analyze(csv: Self.csv_jun2, now: Self.now_jun2).spans.count, 9)
     }
 
     func test_jun2_lastSpanActive() {

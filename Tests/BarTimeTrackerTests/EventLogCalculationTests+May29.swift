@@ -116,16 +116,16 @@ extension EventLogCalculationTests {
     }
 
     func test_may29_workedTime() {
-        // 8h 36m 19s
-        XCTAssertDuration(analyze(csv: Self.csv_may29, now: Self.now_may29).worked, 30979)
+        // 8h 35m
+        XCTAssertDuration(analyze(csv: Self.csv_may29, now: Self.now_may29).worked, 30900)
     }
 
     func test_may29_projectDurations() {
         let projects = analyze(csv: Self.csv_may29, now: Self.now_may29).projects
-        XCTAssertDuration(projects["apps.qamcom.se"] ?? 0, 12341)
-        XCTAssertDuration(projects["Librixer"] ?? 0, 9092)
-        XCTAssertDuration(projects["Stena sälj"] ?? 0, 8632)
-        XCTAssertDuration(projects["decarb"] ?? 0, 914)
+        XCTAssertDuration(projects["apps.qamcom.se"] ?? 0, 12300)
+        XCTAssertDuration(projects["Librixer"] ?? 0, 10200)
+        XCTAssertDuration(projects["Stena sälj"] ?? 0, 7500)
+        XCTAssertDuration(projects["decarb"] ?? 0, 900)
         XCTAssertNil(projects["Break"])
     }
 }

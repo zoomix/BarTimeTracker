@@ -57,63 +57,90 @@ public struct ProjectDuration {
 
 public enum TimeCalculations {
 
-    /// Merge raw screen-on intervals into logical work spans.
-    /// Gaps < `mergeThreshold` are always merged.
-    /// Larger gaps are merged if the first project entry after the gap is not a Break
-    /// (i.e. the user was doing tracked work during the gap, e.g. a meeting).
+    /// Build logical work spans driven by project-entry transitions.
+    /// Each run of consecutive same-project entries forms one span.
+    /// Span start = end of previous span (or first screen-on for the first span).
+    /// Span end = first away event (off/screensaverOn) at or after the last entry of the
+    /// group but before the next group starts; falls back to the last entry time if none.
+    /// The last span is active when no away event follows its last entry.
     public static func buildTimeSpans(
         from events: [ScreenEvent],
         projectEntries: [ProjectEntry] = [],
         mergeThreshold: TimeInterval = 3 * 60,
         now: Date
     ) -> [TimeSpan] {
-        var rawSpans: [(start: Date, end: Date)] = []
-        var spanStart: Date?
+        guard !projectEntries.isEmpty else { return [] }
 
-        for event in events {
-            switch event.kind {
-            case .on, .screensaverOff:
-                if spanStart == nil { spanStart = event.time }
-            case .off, .screensaverOn:
-                if let s = spanStart {
-                    rawSpans.append((start: s, end: event.time))
-                    spanStart = nil
-                }
+        let firstOn = events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+
+        // Group consecutive same-project entries into (project, firstTime, lastTime)
+        var groupProjects: [String] = []
+        var groupFirsts:   [Date]   = []
+        var groupLasts:    [Date]   = []
+        for entry in projectEntries {
+            if groupProjects.isEmpty || groupProjects[groupProjects.count - 1] != entry.project {
+                groupProjects.append(entry.project)
+                groupFirsts.append(entry.time)
+                groupLasts.append(entry.time)
+            } else {
+                groupLasts[groupLasts.count - 1] = entry.time
             }
         }
-        let activeStart = spanStart
 
-        func gapCoveredByWork(gapEnd: Date) -> Bool {
-            guard let first = projectEntries.first(where: { $0.time >= gapEnd }) else { return false }
-            return first.project != "Break"
+        let awayEvents  = events.filter { $0.kind == .off || $0.kind == .screensaverOn }
+        let hardOffs    = events.filter { $0.kind == .off }
+
+        // First away event (screensaverOn or off) in [from, before)
+        func firstAway(from: Date, before: Date?) -> ScreenEvent? {
+            awayEvents.first(where: { e in
+                e.time >= from && (before == nil || e.time < before!)
+            })
         }
 
-        var merged: [(start: Date, end: Date)] = []
-        for span in rawSpans {
-            if let last = merged.last {
-                let gap = span.start.timeIntervalSince(last.end)
-                if gap < mergeThreshold || gapCoveredByWork(gapEnd: span.start) {
-                    merged[merged.count - 1] = (start: last.start, end: span.end)
-                    continue
-                }
-            }
-            merged.append(span)
+        // First hard off in [from, before)
+        func firstHardOff(from: Date, before: Date?) -> Date? {
+            hardOffs.first(where: { e in
+                e.time >= from && (before == nil || e.time < before!)
+            })?.time
         }
 
-        var result = merged.map { TimeSpan(start: $0.start, end: $0.end, isActive: false) }
-        if let active = activeStart {
-            if let last = merged.last {
-                let gap = active.timeIntervalSince(last.end)
-                if gap < mergeThreshold || gapCoveredByWork(gapEnd: active) {
-                    result[result.count - 1] = TimeSpan(start: last.start, end: nil, isActive: true)
+        // Span end for non-last groups: if screensaverOn is first, promote to a subsequent
+        // hard off when it arrives quickly (< 30 min) and still before the next group.
+        let screensaverOffThreshold: TimeInterval = 30 * 60
+
+        var spans: [TimeSpan] = []
+        var spanStart = firstOn ?? groupFirsts[0]
+
+        for i in 0..<groupProjects.count {
+            let last      = groupLasts[i]
+            let nextFirst: Date? = i + 1 < groupProjects.count ? groupFirsts[i + 1] : nil
+            let isLast    = nextFirst == nil
+
+            if isLast {
+                // For the last group only hard off counts; screensaverOn means still active.
+                if let hardOff = firstHardOff(from: last, before: nil) {
+                    spans.append(TimeSpan(start: spanStart, end: hardOff, isActive: false))
                 } else {
-                    result.append(TimeSpan(start: active, end: nil, isActive: true))
+                    spans.append(TimeSpan(start: spanStart, end: nil, isActive: true))
                 }
             } else {
-                result.append(TimeSpan(start: active, end: nil, isActive: true))
+                if let away = firstAway(from: last, before: nextFirst) {
+                    var spanEnd = away.time
+                    if away.kind == .screensaverOn,
+                       let hardOff = firstHardOff(from: away.time, before: nextFirst),
+                       hardOff.timeIntervalSince(away.time) <= screensaverOffThreshold {
+                        spanEnd = hardOff
+                    }
+                    spans.append(TimeSpan(start: spanStart, end: spanEnd, isActive: false))
+                    spanStart = spanEnd
+                } else {
+                    spans.append(TimeSpan(start: spanStart, end: last, isActive: false))
+                    spanStart = last
+                }
             }
         }
-        return result
+
+        return spans
     }
 
     /// Time attributed to each project within [spanStart, spanEnd].
