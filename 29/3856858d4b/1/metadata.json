@@ -1,0 +1,68 @@
+{
+  "cli_version": "0.6.2",
+  "checkpoint_id": "293856858d4b",
+  "session_id": "cc7cf4a3-5e63-4661-a21c-9efce241b065",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-07T14:19:34.545814Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "05d09a1aae24",
+  "token_usage": {
+    "input_tokens": 37,
+    "cache_creation_tokens": 50453,
+    "cache_read_tokens": 779187,
+    "output_tokens": 6542,
+    "api_call_count": 23
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-07T14:19:34.542018Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 2,
+    "total_committed": 0,
+    "total_lines_changed": 2,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 576,
+      "user_lines_removed": 2,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".vscode/launch.json": 24,
+        "Sources/BarTimeTracker/AppDelegate.swift": 10,
+        "Sources/BarTimeTrackerCore/EventLog.swift": 39,
+        "Sources/BarTimeTrackerCore/EventLogParser.swift": 64,
+        "Tests/BarTimeTrackerTests/EventLogCalculationTests+Jun1.swift": 130,
+        "Tests/BarTimeTrackerTests/EventLogCalculationTests+Jun2.swift": 115,
+        "Tests/BarTimeTrackerTests/EventLogCalculationTests+May28.swift": 43,
+        "Tests/BarTimeTrackerTests/EventLogCalculationTests+May29.swift": 107,
+        "Tests/BarTimeTrackerTests/EventLogCalculationTests.swift": 43,
+        "build.sh": 1
+      },
+      "user_removed_per_file": {
+        "Sources/BarTimeTracker/AppDelegate.swift": 2
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 592,
+      "agent_lines_removed": 2
+    }
+  ]
+}
