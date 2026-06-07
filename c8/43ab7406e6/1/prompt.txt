@@ -1,0 +1,17 @@
+<ide_selection>The user selected the lines 86 to 88 from /Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests+May29.swift:
+    func test_may29_spanCount() {
+        XCTAssertEqual(analyze(csv: Self.csv_may29, now: Self.now_may29).spans.count, 15)
+    }
+
+This may or may not be related to the current task.</ide_selection>
+Can we not just count the spans, but print them individually. One line per span hh:mm - hh:mm
+
+And assert it to a static string
+
+---
+
+<ide_selection>The user selected the lines 104 to 104 from /Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests+May29.swift:
+    }
+
+This may or may not be related to the current task.</ide_selection>
+Great, can you print the project for each span as well.
