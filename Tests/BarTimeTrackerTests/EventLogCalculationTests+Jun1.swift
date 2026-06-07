@@ -1,4 +1,5 @@
 import XCTest
+@testable import BarTimeTrackerCore
 
 // June 1 — long apps.qamcom.se day with Fineasity morning, brief Stena sälj and Librixer.
 // Expected: 20 spans (all closed), 9h 31m 35s worked.
@@ -18,9 +19,8 @@ extension EventLogCalculationTests {
     2026-06-01,05:13:58,on,computer,-
     2026-06-01,05:13:58,off,computer,-
     2026-06-01,06:53:44,on,computer,-
-    2026-06-01,07:14:27,screensaverOff,computer,-
-    2026-05-31,23:11:50,entry,user,Break
     2026-06-01,06:53:44,off,computer,-
+    2026-06-01,07:14:27,screensaverOff,computer,-
     2026-06-01,07:14:45,on,computer,-
     2026-06-01,07:15:17,entry,user,Break
     2026-06-01,07:15:17,off,computer,-
@@ -28,7 +28,7 @@ extension EventLogCalculationTests {
     2026-06-01,07:54:40,entry,user,Break
     2026-06-01,07:54:40,off,computer,-
     2026-06-01,07:54:54,on,computer,-
-    2026-06-01,07:15:17,entry,user,Break
+    2026-06-01,07:54:54,entry,user,Break
     2026-06-01,08:10:04,entry,user,Fineasity
     2026-06-01,08:25:10,entry,user,Fineasity
     2026-06-01,08:40:34,entry,user,apps.qamcom.se
@@ -46,13 +46,12 @@ extension EventLogCalculationTests {
     2026-06-01,11:47:57,entry,user,apps.qamcom.se
     2026-06-01,11:47:57,screensaverOn,computer,-
     2026-06-01,11:50:37,screensaverOff,computer,-
-    2026-06-01,11:47:45,entry,user,apps.qamcom.se
+    2026-06-01,11:50:37,entry,user,apps.qamcom.se
     2026-06-01,12:21:12,entry,user,apps.qamcom.se
     2026-06-01,12:37:08,entry,user,apps.qamcom.se
     2026-06-01,12:44:23,entry,user,apps.qamcom.se
     2026-06-01,12:44:23,screensaverOn,computer,-
     2026-06-01,12:56:19,screensaverOff,computer,-
-    2026-06-01,12:44:23,entry,user,Break
     2026-06-01,13:11:28,entry,user,Break
     2026-06-01,13:26:45,entry,user,apps.qamcom.se
     2026-06-01,13:42:22,entry,user,apps.qamcom.se
@@ -70,13 +69,11 @@ extension EventLogCalculationTests {
     2026-06-01,16:48:42,entry,user,apps.qamcom.se
     2026-06-01,16:48:42,screensaverOn,computer,-
     2026-06-01,17:07:42,screensaverOff,computer,-
-    2026-06-01,16:45:11,entry,user,apps.qamcom.se
     2026-06-01,17:22:47,entry,user,apps.qamcom.se
     2026-06-01,17:37:55,entry,user,apps.qamcom.se
     2026-06-01,17:53:20,entry,user,apps.qamcom.se
     2026-06-01,18:10:12,off,computer,-
     2026-06-01,18:40:45,on,computer,-
-    2026-06-01,18:59:18,entry,user,Break
     2026-06-01,18:47:25,off,computer,-
     2026-06-01,18:59:26,on,computer,-
     2026-06-01,19:01:04,entry,user,Break
@@ -84,7 +81,6 @@ extension EventLogCalculationTests {
     2026-06-01,19:51:39,on,computer,-
     2026-06-01,19:51:39,off,computer,-
     2026-06-01,20:05:40,on,computer,-
-    2026-06-01,19:01:04,entry,user,Break
     2026-06-01,20:05:40,off,computer,-
     2026-06-01,20:17:02,on,computer,-
     2026-06-01,20:30:24,entry,user,Break
@@ -106,9 +102,38 @@ extension EventLogCalculationTests {
     2026-06-01,22:47:29,entry,user,Break
     """
 
-    func test_jun1_spanCount() {
-        XCTAssertEqual(analyze(csv: Self.csv_jun1, now: Self.now_jun1).spans.count, 12)
+
+    func test_jun1_spans() {
+        let result = analyze(csv: Self.csv_jun1, now: Self.now_jun1)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        fmt.timeZone = Self.tz
+        let actual = result.spans.map { s in
+            let start = fmt.string(from: s.start)
+            let end = s.end.map { fmt.string(from: $0) } ?? "?"
+            let durations = TimeCalculations.projectDurations(
+                entries: result.entries, firstOnTime: result.firstOn,
+                spanStart: s.start, spanEnd: s.end ?? Self.now_jun1
+            )
+            let project = durations.first?.project ?? "-"
+            return "\(start) - \(end)  \(project)"
+        }.joined(separator: "\n")
+        XCTAssertEqual(actual, """
+            01:17 - 07:54  Break
+            07:54 - 08:25  Fineasity
+            08:25 - 08:40  apps.qamcom.se
+            08:40 - 08:55  Librixer
+            08:55 - 09:29  apps.qamcom.se
+            09:29 - 09:44  Fineasity
+            09:44 - 10:00  Stena sälj
+            10:00 - 11:01  Fineasity
+            11:01 - 12:44  apps.qamcom.se
+            12:44 - 13:11  Break
+            13:11 - 18:10  apps.qamcom.se
+            18:10 - 22:49  Break
+            """.trimmingCharacters(in: .whitespacesAndNewlines))
     }
+
 
     func test_jun1_allClosed() {
         XCTAssertTrue(analyze(csv: Self.csv_jun1, now: Self.now_jun1).spans.allSatisfy { !$0.isActive })
