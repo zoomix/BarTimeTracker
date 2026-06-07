@@ -13,61 +13,8 @@ jobs:
 
       - name: Build fat universal app
         run: |
-          APP="BarTimeTracker.app"
-          BINARY_DIR="$APP/Contents/MacOS"
-          mkdir -p "$BINARY_DIR"
-
-          build_slice() {
-            local TARGET="$1"
-            local OUT="$2"
-            local MODULE_DIR
-            MODULE_DIR="$(mktemp -d)"
-
-            # Compile BarTimeTrackerCore to a single object + swiftmodule
-            swiftc \
-              Sources/BarTimeTrackerCore/EventLog.swift \
-              Sources/BarTimeTrackerCore/EventLogParser.swift \
-              Sources/BarTimeTrackerCore/TimeCalculations.swift \
-              -target "$TARGET" \
-              -module-name BarTimeTrackerCore \
-              -parse-as-library \
-              -whole-module-optimization \
-              -emit-module \
-              -emit-module-path "$MODULE_DIR/BarTimeTrackerCore.swiftmodule" \
-              -framework Foundation \
-              -c \
-              -o "$MODULE_DIR/BarTimeTrackerCore.o"
-
-            # Build main target, linking core object
-            swiftc \
-              Sources/BarTimeTracker/main.swift \
-              Sources/BarTimeTracker/AppDelegate.swift \
-              Sources/BarTimeTracker/ProjectPromptWindow.swift \
-              Sources/BarTimeTracker/WeekTimelineWindow.swift \
-              "$MODULE_DIR/BarTimeTrackerCore.o" \
-              -target "$TARGET" \
-              -I "$MODULE_DIR" \
-              -o "$OUT" \
-              -framework AppKit \
-              -framework Foundation \
-              -framework IOKit
-          }
-
-          build_slice x86_64-apple-macosx13.0 "$BINARY_DIR/bar"
-          build_slice arm64-apple-macosx13.0  "$BINARY_DIR/arm64"
-
-          # Combine into universal binary
-          lipo -create "$BINARY_DIR/bar" "$BINARY_DIR/arm64" \
-            -output "$BINARY_DIR/BarTimeTracker"
-          rm "$BINARY_DIR/bar" "$BINARY_DIR/arm64"
-
-          # Set up app bundle
-          cp Info.plist "$APP/Contents/"
-
-          # Ad-hoc sign the bundle
-          codesign --force --sign - \
-            --identifier com.user.BarTimeTrackerF.Debug \
-            "$APP"
+          chmod +x build.sh
+          ./build.sh --universal
 
       - name: Upload universal app
         uses: actions/upload-artifact@v4
