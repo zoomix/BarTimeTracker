@@ -72,10 +72,9 @@ private func projectColor(_ project: String) -> NSColor {
     return projectPalette[abs(h) % projectPalette.count]
 }
 
-/// Format a time interval as decimal hours, suitable for pasting into a
-/// time-reporting tool. Always two decimals (e.g. "2.50", "6.75", "0.25").
 private func decimalHours(_ interval: TimeInterval) -> String {
-    String(format: "%.2f", interval / 3600)
+    let totalMins = Int(interval / 60)
+    return String(format: "%d:%02d", totalMins / 60, totalMins % 60)
 }
 
 // MARK: - Data models
