@@ -14,6 +14,7 @@ mkdir -p "$RESOURCES_DIR"
 
 echo "Compiling Swift sources..."
 swiftc Sources/BarTimeTrackerCore/TimeCalculations.swift \
+    Sources/BarTimeTrackerCore/EventLog.swift \
     Sources/BarTimeTracker/main.swift \
     Sources/BarTimeTracker/AppDelegate.swift \
     Sources/BarTimeTracker/ProjectPromptWindow.swift \

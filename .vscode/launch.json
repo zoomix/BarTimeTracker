@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BarTimeTracker}",
+            "name": "Debug BarTimeTracker",
+            "target": "BarTimeTracker",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug BarTimeTracker"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BarTimeTracker}",
+            "name": "Release BarTimeTracker",
+            "target": "BarTimeTracker",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release BarTimeTracker"
+        }
+    ]
+}
