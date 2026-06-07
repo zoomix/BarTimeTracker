@@ -54,6 +54,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         return dir.appendingPathComponent("heartbeat")
     }()
 
+    lazy var eventLog: EventLog = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = base.appendingPathComponent("BarTimeTracker")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return EventLog(fileURL: dir.appendingPathComponent("events.csv"))
+    }()
+
     let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.outputFormatting = .prettyPrinted
@@ -201,6 +208,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         if let last = todayEvents.last, last.kind == kind { return }
         data.screenEvents.append(ScreenEvent(kind: kind, time: time))
         saveData(data)
+        eventLog.append(at: time, eventType: kind.rawValue, eventSource: "computer", projectName: "-")
     }
 
     // MARK: - Focus Monitoring
@@ -236,6 +244,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         var data = loadData()
         data.projectEntries.append(ProjectEntry(project: project, time: time))
         saveData(data)
+        eventLog.append(at: time, eventType: "entry", eventSource: "user", projectName: project)
         scheduleProjectTimer()
     }
 
@@ -517,7 +526,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 recentProjects: self.recentProjects()
             )
             self.promptWindow = window
-            let awayTime = self.pendingPromptEntryTime  // when user left — nil if manually triggered
             let returnTime = Date()
 
             window.onSave = { [weak self] val in
@@ -529,7 +537,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             window.onBreak = { [weak self] in
                 guard let self else { return }
                 self.currentProject = "Break"
-                self.recordProjectEntry("Break", at: awayTime ?? returnTime)  // break covers the absence
+                self.recordProjectEntry("Break", at: returnTime)
             }
 
             window.onDismiss = { [weak self] in
