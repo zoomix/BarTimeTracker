@@ -1,0 +1,25 @@
+Alright. Make tests for the new tracking. /Users/srdkvr/Library/Application Support/BarTimeTracker/events.csv
+We're separating tracking from calculations. 
+
+Tracking one thing, written down to events. 
+Calculations of timespans separate. Now we have testing data. 
+Use testing data to implement algorithm. Write test that verify algorithm based on test data. I will verify the results are to my liking and change the test results where I feel otherwise. You then redo the algorithm.
+
+Make sense?
+
+---
+
+<ide_selection>The user selected the lines 59 to 59 from /Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests.swift:
+2026-05-28,17:02:05,entry,user,Break
+
+This may or may not be related to the current task.</ide_selection>
+Ok. The tracking is off. We used to fiddle with the timelines by inserting historic times for when stuff happened - case in point selected. 
+
+Notice the extra "2026-05-28,17:02:05,entry,user,Break"
+
+That's artifical and not supposed to be recorded anymore. We only record events as they happen. We don't insert ghort events. It's better to just calculate that at calculation time.
+
+---
+
+<ide_opened_file>The user opened the file /Users/srdkvr/source/BarTimeTracker/Tests/BarTimeTrackerTests/EventLogCalculationTests.swift in the IDE. This may or may not be related to the current task.</ide_opened_file>
+Can you split the tests up by day? this endless list is hard to work with =(
