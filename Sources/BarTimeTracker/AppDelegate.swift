@@ -535,6 +535,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 return
             }
 
+            // First prompt of the day — silently record Break at first screen-on, no window needed
+            if isAutoPrompt, let breakTime = self.openingBreakTime() {
+                self.currentProject = "Break"
+                self.recordProjectEntry("Break", at: breakTime)
+                self.scheduleProjectTimer()
+                return
+            }
+
             // Don't stack prompts — but resurface existing window if manually triggered
             guard self.promptWindow == nil else {
                 if !isAutoPrompt { self.promptWindow?.show() }
