@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "3de865e92b30",
+  "session_id": "fae5ffee-5ff5-4100-a73a-ee677cc3785b",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T12:51:49.512048Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "84d335bf4e54",
+  "checkpoint_transcript_start": 115,
+  "transcript_lines_at_start": 115,
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 3323,
+    "cache_read_tokens": 136774,
+    "output_tokens": 305,
+    "api_call_count": 2
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T12:51:49.505559Z",
+    "agent_lines": 21,
+    "agent_removed": 2,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 21,
+    "total_lines_changed": 23,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
