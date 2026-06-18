@@ -1,0 +1,1 @@
+Can we skip showing the promptwindow on first entry and just assume Break?
