@@ -133,6 +133,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
         if sinceLastPrompt > promptInterval {
+            // Discard any existing prompt — its captured returnTime is stale (pre-sleep).
+            promptWindow?.close()
+            promptWindow = nil
             pendingPromptEntryTime = screenSleepTime
             askForProject(isAutoPrompt: true)
         }
@@ -162,6 +165,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 pendingPromptEntryTime = start
                 // Delay slightly — screen layout isn't stable the instant the screensaver ends
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Discard any stale prompt window — its returnTime predates the screensaver.
+                    self.promptWindow?.close()
+                    self.promptWindow = nil
                     self.askForProject(isAutoPrompt: true)
                 }
             }
