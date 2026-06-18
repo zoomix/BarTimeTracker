@@ -3,7 +3,7 @@
   "checkpoint_id": "fb433150083a",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     "Sources/BarTimeTracker/AppDelegate.swift"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/fb/433150083a/0/full.jsonl",
       "content_hash": "/fb/433150083a/0/content_hash.txt",
       "prompt": "/fb/433150083a/0/prompt.txt"
+    },
+    {
+      "metadata": "/fb/433150083a/1/metadata.json",
+      "transcript": "/fb/433150083a/1/full.jsonl",
+      "content_hash": "/fb/433150083a/1/content_hash.txt",
+      "prompt": "/fb/433150083a/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 35,
-    "cache_creation_tokens": 38027,
-    "cache_read_tokens": 1228750,
-    "output_tokens": 13146,
-    "api_call_count": 31
+    "input_tokens": 63,
+    "cache_creation_tokens": 88235,
+    "cache_read_tokens": 2205990,
+    "output_tokens": 36182,
+    "api_call_count": 51
   }
 }
