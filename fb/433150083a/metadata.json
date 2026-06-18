@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.5",
+  "checkpoint_id": "fb433150083a",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fb/433150083a/0/metadata.json",
+      "transcript": "/fb/433150083a/0/full.jsonl",
+      "content_hash": "/fb/433150083a/0/content_hash.txt",
+      "prompt": "/fb/433150083a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 35,
+    "cache_creation_tokens": 38027,
+    "cache_read_tokens": 1228750,
+    "output_tokens": 13146,
+    "api_call_count": 31
+  }
+}

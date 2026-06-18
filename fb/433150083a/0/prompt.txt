@@ -1,0 +1,91 @@
+This project is still back-dating time events. When my computer wakes up in the morning it asks me what I was up to. I select "break", but it back-dates that event to when the computer was last turned off. Right? That's not great
+
+---
+
+<task-notification>
+<task-id>ae42fabe0c0e11102</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-srdkvr-source-BarTimeTracker/326194b0-0b02-4f6d-bd19-567c1663611b/tasks/ae42fabe0c0e11102.output</output-file>
+<status>completed</status>
+<summary>Agent "Find wake-up event back-dating code" came to rest</summary>
+<note>A task-notification fires each time this agent comes to rest with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Perfect! Now I have all the information needed. Let me compile my findings.
+
+## Summary: Wake-up Detection and Time Event Creation
+
+Based on a thorough search of the codebase, here are the relevant locations for handling computer wake-up detection and time event creation:
+
+### 1. **Wake/Sleep Detection Setup**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 115-127** - Screen monitoring setup:
+- Registers for `NSWorkspace.screensDidWakeNotification` (when screen wakes)
+- Registers for `NSWorkspace.screensDidSleepNotification` (when screen sleeps)
+- Also monitors screensaver start/stop events via `DistributedNotificationCenter`
+
+### 2. **Wake Detection Handler**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 129-139** - `@objc func screenWoke()`:
+- Triggered when screen/display wakes from sleep
+- Records screen-on event
+- Checks if enough time has passed since last prompt (`sinceLastPrompt &gt; promptInterval`)
+- If threshold met and user not logged out: stores the sleep time in `screenSleepTime` as `pendingPromptEntryTime` and triggers `askForProject(isAutoPrompt: true)` to prompt user
+
+### 3. **Sleep Detection Handler**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 140-148** - `@objc func screenSlept()`:
+- Triggered when screen/display goes to sleep
+- Captures the time in `screenSleepTime` (used later as the departure timestamp)
+- Records the current project entry at sleep time
+
+### 4. **User Prompt for Activity**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/ProjectPromptWindow.swift`
+
+**Lines 3-192** - ProjectPromptWindow class:
+- Shows UI with "Working on?" text field (line 55)
+- User can input project name, click Save, Break, or Skip (lines 75-99)
+- Window displays "What's up?" when idle (line 106)
+- Two view states: idle state and input state (lines 101-147)
+
+### 5. **Timestamp Capture and Event Creation**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 507-551** - `func askForProject(isAutoPrompt: Bool)`:
+- **Line 527:** Captures the return time: `let returnTime = Date()` (when user returns and prompt is shown)
+- **Lines 529-533:** When user saves via `onSave` callback, records project entry at the captured return time with comment "project starts at return, not departure"
+- **Lines 535-539:** When user clicks "Break", records Break entry at return time
+- **Lines 541-546:** Cleanup via `onDismiss` callback
+
+### 6. **Project Entry Recording**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 241-247** - `func recordProjectEntry(_ project: String, at time: Date = Date())`:
+- Appends ProjectEntry with specified timestamp to event data
+- Also logs to CSV event log via `eventLog.append(at: time, ...)`
+- Schedules next prompt timer
+
+### 7. **Event Log Timestamp**
+**File:** `/Users/srdkvr/source/BarTimeTrackerCore/EventLog.swift`
+
+**Lines 26-33** - `func append(at date: Date = Date(), ...)`:
+- Records event with date/time split into date (yyyy-MM-dd) and time (HH:mm:ss) components
+- Appends to CSV file with columns: date, time, event_type, event_source, project_name
+
+### 8. **Screensaver Wake-up Variant**
+**File:** `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Lines 155-169** - `@objc func screensaverStopped()`:
+- Alternative wake path when screensaver ends
+- Sets `pendingPromptEntryTime = start` (line 162) to capture screensaver start time
+- Delays 0.5 seconds then calls `askForProject(isAutoPrompt: true)` (lines 164-166)
+- Triggers only if absence &gt; 60 seconds
+
+### Key Data Structures
+- **ProjectEntry** (`/Users/srdkvr/source/BarTimeTrackerCore/TimeCalculations.swift`, lines 19-27): Contains `project: String` and `time: Date`
+- **ScreenEvent** (lines 5-17): Contains `kind` and `time` for tracking screen on/off/screensaver states
+
+The overall flow: Display wakes → `screenWoke()` triggered → checks time since last prompt → `askForProject()` shows UI → captures `returnTime` when window created → user responds → `recordProjectEntry()` called with that timestamp → event logged to CSV with split date/time fields.</result>
+<usage><subagent_tokens>30481</subagent_tokens><tool_uses>19</tool_uses><duration_ms>54907</duration_ms></usage>
+</task-notification>
