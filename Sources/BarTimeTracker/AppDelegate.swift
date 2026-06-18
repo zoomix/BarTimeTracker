@@ -252,6 +252,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         scheduleProjectTimer()
     }
 
+    // Returns the first screen-on time today when no project entries exist yet for today.
+    private func openingBreakTime() -> Date? {
+        let data = loadData()
+        let hasEntries = data.projectEntries.contains {
+            Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~")
+        }
+        guard !hasEntries else { return nil }
+        return data.screenEvents
+            .filter { Calendar.current.isDateInToday($0.time) && ($0.kind == .on || $0.kind == .screensaverOff) }
+            .map(\.time).min()
+    }
+
+    private func insertOpeningBreakIfNeeded(before time: Date) {
+        guard let breakTime = openingBreakTime(), breakTime < time else { return }
+        recordProjectEntry("Break", at: breakTime)
+    }
+
     // MARK: - Time Calculation (delegated to BarTimeTrackerCore)
 
     func formatDuration(_ interval: TimeInterval) -> String {
@@ -535,13 +552,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             window.onSave = { [weak self] val in
                 guard let self else { return }
                 self.currentProject = val
-                self.recordProjectEntry(val, at: returnTime)  // project starts at return, not departure
+                self.insertOpeningBreakIfNeeded(before: returnTime)
+                self.recordProjectEntry(val, at: returnTime)
             }
 
             window.onBreak = { [weak self] in
                 guard let self else { return }
                 self.currentProject = "Break"
-                self.recordProjectEntry("Break", at: returnTime)
+                let breakTime = self.openingBreakTime() ?? returnTime
+                self.recordProjectEntry("Break", at: breakTime)
             }
 
             window.onDismiss = { [weak self] in
