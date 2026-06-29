@@ -105,6 +105,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         setupHeartbeat()
         recordScreenEvent(.on)
         scheduleProjectTimer()
+        // Eagerly record opening Break at startup — timer then fires for the first real prompt.
+        if let breakTime = openingBreakTime() {
+            currentProject = "Break"
+            recordProjectEntry("Break", at: breakTime)
+            lastPromptShown = Date()
+        }
         DispatchQueue.main.async { [weak self] in
             self?.openWeekView()
         }
@@ -130,6 +136,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         recordScreenEvent(.on)
         if projectTimer == nil { scheduleProjectTimer() }
         guard !isLoggedOut else { return }
+        // First of day: record Break eagerly so the next timer fires shows the real prompt.
+        if let breakTime = openingBreakTime() {
+            currentProject = "Break"
+            recordProjectEntry("Break", at: breakTime)
+            lastPromptShown = Date()
+            return
+        }
         // Prompt on lid-open return if absent long enough (screensaver path handles its own)
         let sinceLastPrompt = Date().timeIntervalSince(lastPromptShown ?? .distantPast)
         if sinceLastPrompt > promptInterval {
@@ -158,6 +171,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     @objc func screensaverStopped() {
         recordScreenEvent(.screensaverOff)
         guard !isLoggedOut else { screensaverStartTime = nil; return }
+        // First of day: record Break eagerly and skip prompt.
+        if let breakTime = openingBreakTime() {
+            currentProject = "Break"
+            recordProjectEntry("Break", at: breakTime)
+            lastPromptShown = Date()
+            screensaverStartTime = nil
+            return
+        }
         if let start = screensaverStartTime {
             let absence = Date().timeIntervalSince(start)
             screensaverStartTime = nil
