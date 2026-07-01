@@ -106,9 +106,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         recordScreenEvent(.on)
         scheduleProjectTimer()
         // Eagerly record opening Break at startup — timer then fires for the first real prompt.
-        if let breakTime = openingBreakTime() {
+        if isOpeningBreakNeeded() {
             currentProject = "Break"
-            recordProjectEntry("Break", at: breakTime)
+            recordProjectEntry("Break")
             lastPromptShown = Date()
         }
         DispatchQueue.main.async { [weak self] in
@@ -137,9 +137,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         if projectTimer == nil { scheduleProjectTimer() }
         guard !isLoggedOut else { return }
         // First of day: record Break eagerly so the next timer fires shows the real prompt.
-        if let breakTime = openingBreakTime() {
+        if isOpeningBreakNeeded() {
             currentProject = "Break"
-            recordProjectEntry("Break", at: breakTime)
+            recordProjectEntry("Break")
             lastPromptShown = Date()
             return
         }
@@ -172,9 +172,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         recordScreenEvent(.screensaverOff)
         guard !isLoggedOut else { screensaverStartTime = nil; return }
         // First of day: record Break eagerly and skip prompt.
-        if let breakTime = openingBreakTime() {
+        if isOpeningBreakNeeded() {
             currentProject = "Break"
-            recordProjectEntry("Break", at: breakTime)
+            recordProjectEntry("Break")
             lastPromptShown = Date()
             screensaverStartTime = nil
             return
@@ -273,21 +273,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         scheduleProjectTimer()
     }
 
-    // Returns the first screen-on time today when no project entries exist yet for today.
-    private func openingBreakTime() -> Date? {
+    // True when no project entries exist yet today, meaning an opening Break should be recorded.
+    private func isOpeningBreakNeeded() -> Bool {
         let data = loadData()
-        let hasEntries = data.projectEntries.contains {
+        return !data.projectEntries.contains {
             Calendar.current.isDateInToday($0.time) && !$0.project.hasPrefix("~")
         }
-        guard !hasEntries else { return nil }
-        return data.screenEvents
-            .filter { Calendar.current.isDateInToday($0.time) && ($0.kind == .on || $0.kind == .screensaverOff) }
-            .map(\.time).min()
     }
 
-    private func insertOpeningBreakIfNeeded(before time: Date) {
-        guard let breakTime = openingBreakTime(), breakTime < time else { return }
-        recordProjectEntry("Break", at: breakTime)
+    private func insertOpeningBreakIfNeeded(at time: Date) {
+        guard isOpeningBreakNeeded() else { return }
+        recordProjectEntry("Break", at: time)
     }
 
     // MARK: - Time Calculation (delegated to BarTimeTrackerCore)
@@ -556,10 +552,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
                 return
             }
 
-            // First prompt of the day — silently record Break at first screen-on, no window needed
-            if isAutoPrompt, let breakTime = self.openingBreakTime() {
+            // First prompt of the day — silently record Break now, no window needed
+            if isAutoPrompt, self.isOpeningBreakNeeded() {
                 self.currentProject = "Break"
-                self.recordProjectEntry("Break", at: breakTime)
+                self.recordProjectEntry("Break")
                 self.scheduleProjectTimer()
                 return
             }
@@ -581,15 +577,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
             window.onSave = { [weak self] val in
                 guard let self else { return }
                 self.currentProject = val
-                self.insertOpeningBreakIfNeeded(before: returnTime)
+                self.insertOpeningBreakIfNeeded(at: returnTime)
                 self.recordProjectEntry(val, at: returnTime)
             }
 
             window.onBreak = { [weak self] in
                 guard let self else { return }
                 self.currentProject = "Break"
-                let breakTime = self.openingBreakTime() ?? returnTime
-                self.recordProjectEntry("Break", at: breakTime)
+                self.recordProjectEntry("Break", at: returnTime)
             }
 
             window.onDismiss = { [weak self] in
