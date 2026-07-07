@@ -385,10 +385,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         let isoFmt = DateFormatter()
         isoFmt.dateFormat = "yyyy-MM-dd"
         let allDates = appData.screenEvents.map(\.time) + appData.projectEntries.map(\.time)
-        let prevDays = Array(Set(allDates
+        let candidateDays = Array(Set(allDates
             .filter { !cal.isDateInToday($0) }
             .map { cal.startOfDay(for: $0) }))
             .sorted(by: >)
+        let now = Date()
+        let prevDays = Array(candidateDays.filter { day in
+            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
+            let dayProjects = appData.projectEntries
+                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
+                .sorted { $0.time < $1.time }
+            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+            let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
+            let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
+            return worked > 30 * 60
+        }.prefix(15))
         if !prevDays.isEmpty {
             let prevItem = NSMenuItem(title: "Previous days", action: nil, keyEquivalent: "")
             let prevSubmenu = NSMenu()
