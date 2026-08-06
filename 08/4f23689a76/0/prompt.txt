@@ -1,0 +1,9 @@
+Clicking the menubar item here takes a second to open the menu. That feels broken. What can we do to speed it up?
+
+---
+
+Still too slow
+
+---
+
+Oh no. You have to use the ./build.sh and ./restart.sh - otherwise macos will disallow my app from the menubar thinking it's flaky
