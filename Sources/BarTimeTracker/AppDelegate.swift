@@ -3,7 +3,7 @@ import Foundation
 import IOKit.pwr_mgt
 import BarTimeTrackerCore
 
-class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStore {
     static let heartbeatStaleThreshold: TimeInterval = 10 * 60
     static let heartbeatInterval: TimeInterval = 30
 
@@ -20,6 +20,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
     var screensaverStartTime: Date?
     var screenSleepTime: Date?
     var pendingPromptEntryTime: Date?
+    weak var previousDaysMenu: NSMenu?
+    var dayMenus: [NSMenu: Date] = [:]
 
     let intervalKey = "promptInterval"
     let logoutDateKey = "logoutDate"
@@ -380,38 +382,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         intervalItem.submenu = intervalSubmenu
         menu.addItem(intervalItem)
 
-        // Previous days submenu
+        // Previous days submenu — populated lazily (see menuNeedsUpdate) so opening the
+        // menu doesn't require walking every past day's events up front.
         let cal = Calendar.current
-        let isoFmt = DateFormatter()
-        isoFmt.dateFormat = "yyyy-MM-dd"
-        let allDates = appData.screenEvents.map(\.time) + appData.projectEntries.map(\.time)
-        let candidateDays = Array(Set(allDates
-            .filter { !cal.isDateInToday($0) }
-            .map { cal.startOfDay(for: $0) }))
-            .sorted(by: >)
-        let now = Date()
-        var prevDays: [Date] = []
-        for day in candidateDays {
-            if prevDays.count >= 15 { break }
-            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
-            let dayProjects = appData.projectEntries
-                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
-                .sorted { $0.time < $1.time }
-            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
-            let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
-            let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
-            if worked > 30 * 60 { prevDays.append(day) }
-        }
-        if !prevDays.isEmpty {
+        let hasPrevDays = appData.screenEvents.contains { !cal.isDateInToday($0.time) }
+            || appData.projectEntries.contains { !cal.isDateInToday($0.time) }
+        if hasPrevDays {
             let prevItem = NSMenuItem(title: "Previous days", action: nil, keyEquivalent: "")
             let prevSubmenu = NSMenu()
-            for day in prevDays {
-                let dayItem = NSMenuItem(title: isoFmt.string(from: day), action: nil, keyEquivalent: "")
-                let dayMenu = NSMenu()
-                addDayItems(to: dayMenu, date: day, appData: appData, timeFmt: timeFmt)
-                dayItem.submenu = dayMenu
-                prevSubmenu.addItem(dayItem)
-            }
+            prevSubmenu.delegate = self
+            previousDaysMenu = prevSubmenu
             prevItem.submenu = prevSubmenu
             menu.addItem(prevItem)
         }
@@ -436,6 +416,57 @@ class AppDelegate: NSObject, NSApplicationDelegate, TimeDataStore {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    // MARK: - Lazy submenu population
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let timeFmt = DateFormatter()
+        timeFmt.timeStyle = .short
+        timeFmt.dateStyle = .none
+
+        if menu === previousDaysMenu {
+            populatePreviousDaysMenu(menu, timeFmt: timeFmt)
+        } else if let day = dayMenus[menu] {
+            menu.removeAllItems()
+            addDayItems(to: menu, date: day, appData: loadData(), timeFmt: timeFmt)
+        }
+    }
+
+    private func populatePreviousDaysMenu(_ menu: NSMenu, timeFmt: DateFormatter) {
+        for item in menu.items {
+            if let sub = item.submenu { dayMenus.removeValue(forKey: sub) }
+        }
+        menu.removeAllItems()
+
+        let appData = loadData()
+        let cal = Calendar.current
+        let isoFmt = DateFormatter()
+        isoFmt.dateFormat = "yyyy-MM-dd"
+        let allDates = appData.screenEvents.map(\.time) + appData.projectEntries.map(\.time)
+        let candidateDays = Array(Set(allDates
+            .filter { !cal.isDateInToday($0) }
+            .map { cal.startOfDay(for: $0) }))
+            .sorted(by: >)
+        let now = Date()
+        for day in candidateDays {
+            if menu.items.count >= 15 { break }
+            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
+            let dayProjects = appData.projectEntries
+                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
+                .sorted { $0.time < $1.time }
+            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+            let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
+            let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
+            guard worked > 30 * 60 else { continue }
+
+            let dayItem = NSMenuItem(title: isoFmt.string(from: day), action: nil, keyEquivalent: "")
+            let dayMenu = NSMenu()
+            dayMenu.delegate = self
+            dayMenus[dayMenu] = day
+            dayItem.submenu = dayMenu
+            menu.addItem(dayItem)
+        }
     }
 
     func addDayItems(to menu: NSMenu, date: Date, appData: AppData, timeFmt: DateFormatter) {
