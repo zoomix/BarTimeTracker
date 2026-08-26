@@ -1,0 +1,122 @@
+We recently made changes to the popup to use Apple Glass style. It looks grand and all, just that.. When it popups up when the timer hits, it will only show the 2 buttons. Skip and Same. To change project, I need to select the popup so that it displays the dropdown. 
+
+Problem is - my clicks go straight through the popup. I can only click the two buttons and some part of the label. I don't want to click the buttons, so I'm left with clicking around the label. Problem is my clicks make it through to whatever is behind the popup.
+
+So. Make the popup focusable again. By click
+
+---
+
+<task-notification>
+<task-id>a5790274da4a0a8c7</task-id>
+<tool-use-id>toolu_016WQfjkrRJS7UWg1Q75Youd</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-srdkvr-source-BarTimeTracker/0bc27515-1b39-4fbb-a254-287a6ea86394/tasks/a5790274da4a0a8c7.output</output-file>
+<status>completed</status>
+<summary>Agent "Find popup window setup code" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>Found everything relevant. Here's the report.
+
+## File: `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/ProjectPromptWindow.swift`
+
+This is the `NSPanel` subclass implementing the speech-bubble prompt (with Skip/Save/Break buttons and the `NSComboBox` dropdown).
+
+**Class declaration and panel init (lines 3, 22–43):**
+```swift
+class ProjectPromptWindow: NSPanel {
+    ...
+    init(currentProject: String, recentProjects: [String]) {
+        let w = ProjectPromptWindow.W
+        let h = ProjectPromptWindow.H + ProjectPromptWindow.tailHeight
+
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: w, height: h),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        level = .floating
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        isReleasedWhenClosed = false
+        hidesOnDeactivate = false
+        syncAppearance()
+
+        buildUI(currentProject: currentProject, recentProjects: recentProjects)
+    }
+
+    override var canBecomeKey: Bool { true }
+```
+(`canBecomeMain`, `becomesKeyOnlyIfNeeded`, and `ignoresMouseEvents` are not overridden/set — the panel relies on `.nonactivatingPanel` styleMask plus a `canBecomeKey` override instead.)
+
+**Appearance sync workaround (lines 47–52):**
+```swift
+    /// This borderless, nonactivating panel doesn't reliably inherit the app's
+    /// effective (dark/light) appearance, so read the real system setting directly.
+    private func syncAppearance() {
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+    }
+```
+
+**Liquid Glass rendering (speech-bubble body) — lines 54–86:** builds `NSGlassEffectContainerView` / `NSGlassEffectView` (`mainGlass.cornerRadius`, `mainGlass.tintColor`) with a separate flat-color `TriangleView` tail (comment explains why the tail isn't glass).
+
+**Anchoring under the menubar icon — `show(startActive:anchor:)`, lines 187–221:** computes screen containing the anchor rect, positions the bubble under the status-item icon (`iconCenterX`, `iconBottomY`), clamps X to screen bounds, positions the tail via `positionTail(apexX:)` (lines 172–178), then calls `orderFrontRegardless()` (line 216) and conditionally `makeKey()`/`makeFirstResponder(comboBox)`.
+
+**Custom key-equivalent handling (Cmd+A select-all) — lines 223–229**, needed because it's a nonactivating panel.
+
+**Skip/Same/Save/Break buttons and combo-box dropdown** — lines 92–164 (`comboBox`, `skipBtn`, `breakBtn`, `saveBtn` in the active/input state; `idleSkip`, `idleSame` in the idle/"What's up?" state).
+
+## File: `/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/AppDelegate.swift`
+
+**Creation and showing of the panel — `askForProject(isAutoPrompt:)`, lines 591–644.** Key excerpt:
+```swift
+608:            guard self.promptWindow == nil else {
+609:                if !isAutoPrompt { self.promptWindow?.show(anchor: self.statusItem.button?.window?.frame) }
+610:                else { self.scheduleProjectTimer() }
+611:                return
+612:            }
+613:
+614:            let window = ProjectPromptWindow(
+615:                currentProject: self.currentProject,
+616:                recentProjects: self.recentProjects()
+617:            )
+618:            self.promptWindow = window
+...
+642:            window.show(startActive: !isAutoPrompt, anchor: self.statusItem.button?.window?.frame)
+```
+This is where the menubar icon's frame (`self.statusItem.button?.window?.frame`) is passed as the `anchor` rect that `ProjectPromptWindow.show` uses to position the speech bubble under the status item.
+
+Note: `WeekTimelineWindow.swift` (`/Users/srdkvr/source/BarTimeTracker/Sources/BarTimeTracker/WeekTimelineWindow.swift`) also matched the grep for panel-related keywords but is a separate, unrelated window (the week timeline view), not the project-prompt bubble.</result>
+<usage><subagent_tokens>20799</subagent_tokens><tool_uses>5</tool_uses><duration_ms>35330</duration_ms></usage>
+</task-notification>
+
+---
+
+Ideally I wouldn't want to click the label. I should be able to click wherever in the popup
+
+---
+
+Right.. Is that the same even with the full 3 buttons and a dropdown?
+Because if it is, it isn't working.
+
+---
+
+They don't though.
+
+---
+
+clicked around
+
+---
+
+That's exactly what I did
+
+---
+
+Sorry. It's not working though =( All the clicks just sip right through. What does the internet have to say about this?
+
+---
+
+This is not working out. I can click individual elements (like the labels etc) but the clicks on the background go right through the popup bubble
