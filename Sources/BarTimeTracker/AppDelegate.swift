@@ -606,7 +606,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
 
             // Don't stack prompts — but resurface existing window if manually triggered
             guard self.promptWindow == nil else {
-                if !isAutoPrompt { self.promptWindow?.show() }
+                if !isAutoPrompt { self.promptWindow?.show(anchor: self.statusItem.button?.window?.frame) }
                 else { self.scheduleProjectTimer() }
                 return
             }
@@ -639,7 +639,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
             }
 
             self.lastPromptShown = Date()
-            window.show(startActive: !isAutoPrompt)
+            window.show(startActive: !isAutoPrompt, anchor: self.statusItem.button?.window?.frame)
         }
     }
 

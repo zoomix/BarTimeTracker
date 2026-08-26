@@ -8,13 +8,17 @@ class ProjectPromptWindow: NSPanel {
     private var comboBox: NSComboBox!
     private var idleContainer: NSView!
     private var inputContainer: NSView!
+    private var blur: NSVisualEffectView!
 
     private static let W: CGFloat = 400
     private static let H: CGFloat = 58
+    private static let tailHeight: CGFloat = 8
+    private static let tailWidth: CGFloat = 16
+    private static let cornerRadius: CGFloat = 10
 
     init(currentProject: String, recentProjects: [String]) {
         let w = ProjectPromptWindow.W
-        let h = ProjectPromptWindow.H
+        let h = ProjectPromptWindow.H + ProjectPromptWindow.tailHeight
 
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: w, height: h),
@@ -39,14 +43,15 @@ class ProjectPromptWindow: NSPanel {
     private func buildUI(currentProject: String, recentProjects: [String]) {
         let w = ProjectPromptWindow.W
         let h = ProjectPromptWindow.H
+        let fullH = h + ProjectPromptWindow.tailHeight
 
-        let blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
         blur.material = .menu
         blur.blendingMode = .behindWindow
         blur.state = .active
         blur.wantsLayer = true
-        blur.layer?.cornerRadius = 10
         blur.layer?.masksToBounds = true
+        applyBubbleMask(tailX: w / 2)
 
         // MARK: Input view
 
@@ -130,6 +135,31 @@ class ProjectPromptWindow: NSPanel {
         contentView = blur
     }
 
+    /// Masks `blur` into a rounded-rect speech bubble with a triangular tail on top, apex at `tailX`.
+    private func applyBubbleMask(tailX: CGFloat) {
+        let w = ProjectPromptWindow.W
+        let h = ProjectPromptWindow.H
+        let r = ProjectPromptWindow.cornerRadius
+        let tw = ProjectPromptWindow.tailWidth
+        let th = ProjectPromptWindow.tailHeight
+
+        let minTailX = r + tw / 2
+        let maxTailX = w - r - tw / 2
+        let apexX = min(max(tailX, minTailX), maxTailX)
+
+        let path = NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: w, height: h), xRadius: r, yRadius: r)
+        let tail = NSBezierPath()
+        tail.move(to: NSPoint(x: apexX - tw / 2, y: h))
+        tail.line(to: NSPoint(x: apexX, y: h + th))
+        tail.line(to: NSPoint(x: apexX + tw / 2, y: h))
+        tail.close()
+        path.append(tail)
+
+        let mask = CAShapeLayer()
+        mask.path = path.toCGPath()
+        blur.layer?.mask = mask
+    }
+
     private func activate() {
         idleContainer.isHidden = true
         inputContainer.isHidden = false
@@ -137,7 +167,7 @@ class ProjectPromptWindow: NSPanel {
         makeFirstResponder(comboBox)
     }
 
-    func show(startActive: Bool = false) {
+    func show(startActive: Bool = false, anchor: NSRect? = nil) {
         if startActive {
             idleContainer.isHidden = true
             inputContainer.isHidden = false
@@ -149,11 +179,20 @@ class ProjectPromptWindow: NSPanel {
         // Recalculate position each time — screen layout may have changed (e.g. after screensaver)
         let w = ProjectPromptWindow.W
         let h = ProjectPromptWindow.H
-        let screen = NSScreen.main ?? NSScreen.screens[0]
-        let menuBarHeight = screen.frame.height - screen.visibleFrame.maxY
-        let x = screen.frame.midX - w / 2
-        let y = screen.frame.maxY - menuBarHeight - h - 10
+        let th = ProjectPromptWindow.tailHeight
+        let screen = (anchor.flatMap { a in NSScreen.screens.first { $0.frame.contains(NSPoint(x: a.midX, y: a.midY)) } })
+            ?? NSScreen.main ?? NSScreen.screens[0]
+
+        let iconCenterX = anchor?.midX ?? screen.frame.midX
+        let iconBottomY = anchor?.minY ?? (screen.frame.maxY - (screen.frame.height - screen.visibleFrame.maxY))
+
+        let margin: CGFloat = 8
+        var x = iconCenterX - w / 2
+        x = min(max(x, screen.visibleFrame.minX + margin), screen.visibleFrame.maxX - w - margin)
+        let y = iconBottomY - h - th - 4
         setFrameOrigin(NSPoint(x: x, y: y))
+
+        applyBubbleMask(tailX: iconCenterX - x)
 
         orderFrontRegardless()
         if startActive {
@@ -188,6 +227,25 @@ class ProjectPromptWindow: NSPanel {
     private func dismiss() {
         close()
         onDismiss?()
+    }
+}
+
+private extension NSBezierPath {
+    /// macOS 13 has no `cgPath` on NSBezierPath (added in 14) — build one by hand.
+    func toCGPath() -> CGPath {
+        let path = CGMutablePath()
+        var points = [NSPoint](repeating: .zero, count: 3)
+        for i in 0..<elementCount {
+            switch element(at: i, associatedPoints: &points) {
+            case .moveTo: path.move(to: points[0])
+            case .lineTo: path.addLine(to: points[0])
+            case .curveTo, .cubicCurveTo: path.addCurve(to: points[2], control1: points[0], control2: points[1])
+            case .quadraticCurveTo: path.addQuadCurve(to: points[1], control: points[0])
+            case .closePath: path.closeSubpath()
+            @unknown default: break
+            }
+        }
+        return path
     }
 }
 
