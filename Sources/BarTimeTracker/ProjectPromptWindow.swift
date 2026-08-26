@@ -73,11 +73,20 @@ class ProjectPromptWindow: NSPanel {
         tailView.fillColor = tint
         root.addSubview(tailView)
 
-        glassContainer = NSGlassEffectContainerView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
+        // NSGlassEffectView composites its material in its own layer and draws nothing into the
+        // window's backing store, so every pixel that isn't a glyph or control has alpha 0 — and the
+        // WindowServer passes clicks straight through transparent regions of a non-opaque window.
+        // A nearly-invisible fill in the bubble's own shape gives the backing store real alpha, so
+        // clicks land, without squaring off the shadow the way an opaque window background would.
+        let backdrop = BubbleBackdropView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        backdrop.cornerRadius = ProjectPromptWindow.cornerRadius
+        root.addSubview(backdrop)
+
+        glassContainer = ClickThroughGlassContainerView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
         body = NSView(frame: glassContainer.bounds)
         glassContainer.contentView = body
 
-        mainGlass = NSGlassEffectView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        mainGlass = ClickThroughGlassEffectView(frame: NSRect(x: 0, y: 0, width: w, height: h))
         mainGlass.cornerRadius = ProjectPromptWindow.cornerRadius
         mainGlass.tintColor = tint
         body.addSubview(mainGlass)
@@ -87,9 +96,9 @@ class ProjectPromptWindow: NSPanel {
 
         // MARK: Input view
 
-        inputContainer = NSView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        inputContainer = ClickCatchingView(frame: NSRect(x: 0, y: 0, width: w, height: h))
 
-        let label = NSTextField(labelWithString: "Working on?")
+        let label = ClickThroughLabel(labelWithString: "Working on?")
         label.font = .systemFont(ofSize: 10, weight: .medium)
         label.textColor = .secondaryLabelColor
         label.frame = NSRect(x: 12, y: 38, width: 200, height: 12)
@@ -140,7 +149,7 @@ class ProjectPromptWindow: NSPanel {
         let tappable = TappableView(frame: NSRect(x: 0, y: 0, width: w, height: h))
         tappable.onTap = { [weak self] in self?.activate() }
 
-        let idleLabel = NSTextField(labelWithString: "What's up?")
+        let idleLabel = ClickThroughLabel(labelWithString: "What's up?")
         idleLabel.font = .systemFont(ofSize: 13, weight: .medium)
         idleLabel.textColor = .labelColor
         idleLabel.frame = NSRect(x: 14, y: (h - 16) / 2, width: 250, height: 16)
@@ -180,6 +189,7 @@ class ProjectPromptWindow: NSPanel {
     private func activate() {
         idleContainer.isHidden = true
         inputContainer.isHidden = false
+        NSApp.activate(ignoringOtherApps: true)
         makeKey()
         makeFirstResponder(comboBox)
     }
@@ -215,6 +225,7 @@ class ProjectPromptWindow: NSPanel {
 
         orderFrontRegardless()
         if startActive {
+            NSApp.activate(ignoringOtherApps: true)
             makeKey()
             makeFirstResponder(comboBox)
         }
@@ -267,4 +278,42 @@ private class TappableView: NSView {
     var onTap: (() -> Void)?
     override func mouseDown(with event: NSEvent) { onTap?() }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// Nearly-invisible fill in the bubble's shape, purely so the window backing store has non-zero
+/// alpha there and the WindowServer stops treating those pixels as click-through.
+private class BubbleBackdropView: NSView {
+    var cornerRadius: CGFloat = 10
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.black.withAlphaComponent(0.005).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+    }
+}
+
+/// NSGlassEffectContainerView's hitTest claims any point within its bounds, even where a sibling view
+/// sits in front of it. Returning nil when it would claim itself lets clicks reach the real view.
+private class ClickThroughGlassContainerView: NSGlassEffectContainerView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let result = super.hitTest(point)
+        return result === self ? nil : result
+    }
+}
+
+private class ClickThroughGlassEffectView: NSGlassEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let result = super.hitTest(point)
+        return result === self ? nil : result
+    }
+}
+
+/// A non-interactive label that never claims a hit, so clicks reach the view behind it.
+private class ClickThroughLabel: NSTextField {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Swallows clicks on empty space so this nonactivating panel doesn't leak them to the window behind.
+private class ClickCatchingView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) {}
 }
