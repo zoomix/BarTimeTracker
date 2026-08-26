@@ -1,0 +1,51 @@
+how about the actual components. Can we make them a little bit more "Glass"? It's the newest thing from Apple. Is that hard? Would it require a lot of rewriting and reimporting and new deps?
+
+---
+
+Let's go route 1
+
+---
+
+[Image #1]
+
+That .. looks better. But buttons are unclickable and the speech-bubble line is weird. Looks like it points to the top of the menubar instead of the bottom of it, but is cutoff in rendering by the meny buttar
+
+---
+
+Now the buttons aren't visible at all
+
+[Image #2]
+
+---
+
+Better! Now I can kinda see them
+
+However, on load the glass pane is initial white and then animates to black. 
+Does it adapt to the theme? I'm running a dark theme. 
+But the only thing that adaps is the background (as far as I can see). The buttons are still drawn with black text, so I can't make them out. And the dropdown is still very ordinary white with black text. It's very sharp in contrast
+
+---
+
+No difference whatsoever since last restart of the app
+
+---
+
+You're right. My bad! It's set to light. But.. why does the pane go dark then?
+[Image #3]
+
+---
+
+There we go! Aah. It goes black when it looses focus.. Huh. Why is that?
+
+---
+
+Ok, I decided I like that. It's pretty good. 
+
+Can we fix the arrow thing? The speach-bubble arrow is just a stub right now
+[Image #4]
+
+---
+
+Just a rectangle now
+
+[Image #6]
