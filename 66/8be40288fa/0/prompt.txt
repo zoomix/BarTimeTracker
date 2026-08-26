@@ -1,0 +1,1 @@
+Currently the input box is shown dead center at the top of the screen. Can we move it so it's shown close to where menubar icon is rendered? Ideally looking like a speach bubble coming from the icon?
