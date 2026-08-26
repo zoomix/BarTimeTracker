@@ -1,9 +1,9 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "BarTimeTracker",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v26)],
     targets: [
         // Pure calculation logic — no AppKit, testable
         .target(
@@ -14,7 +14,8 @@ let package = Package(
         .executableTarget(
             name: "BarTimeTracker",
             dependencies: ["BarTimeTrackerCore"],
-            path: "Sources/BarTimeTracker"
+            path: "Sources/BarTimeTracker",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "BarTimeTrackerTests",

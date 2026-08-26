@@ -53,8 +53,8 @@ build_slice() {
 
 if $UNIVERSAL; then
   echo "Building fat universal binary..."
-  build_slice x86_64-apple-macosx13.0 "$BINARY_DIR/bar_x86"
-  build_slice arm64-apple-macosx13.0  "$BINARY_DIR/bar_arm64"
+  build_slice x86_64-apple-macosx26.0 "$BINARY_DIR/bar_x86"
+  build_slice arm64-apple-macosx26.0  "$BINARY_DIR/bar_arm64"
   lipo -create "$BINARY_DIR/bar_x86" "$BINARY_DIR/bar_arm64" \
     -output "$BINARY_DIR/BarTimeTracker"
   rm "$BINARY_DIR/bar_x86" "$BINARY_DIR/bar_arm64"

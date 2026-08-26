@@ -8,12 +8,15 @@ class ProjectPromptWindow: NSPanel {
     private var comboBox: NSComboBox!
     private var idleContainer: NSView!
     private var inputContainer: NSView!
-    private var blur: NSVisualEffectView!
+    private var glassContainer: NSGlassEffectContainerView!
+    private var mainGlass: NSGlassEffectView!
+    private var tailView: TriangleView!
+    private var body: NSView!
 
     private static let W: CGFloat = 400
     private static let H: CGFloat = 58
-    private static let tailHeight: CGFloat = 8
     private static let tailWidth: CGFloat = 16
+    private static let tailHeight: CGFloat = 8
     private static let cornerRadius: CGFloat = 10
 
     init(currentProject: String, recentProjects: [String]) {
@@ -34,24 +37,53 @@ class ProjectPromptWindow: NSPanel {
         hasShadow = true
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
+        syncAppearance()
 
         buildUI(currentProject: currentProject, recentProjects: recentProjects)
     }
 
     override var canBecomeKey: Bool { true }
 
+    /// This borderless, nonactivating panel doesn't reliably inherit the app's
+    /// effective (dark/light) appearance, so read the real system setting directly.
+    private func syncAppearance() {
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+    }
+
     private func buildUI(currentProject: String, recentProjects: [String]) {
         let w = ProjectPromptWindow.W
         let h = ProjectPromptWindow.H
         let fullH = h + ProjectPromptWindow.tailHeight
 
-        blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
-        blur.material = .menu
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.wantsLayer = true
-        blur.layer?.masksToBounds = true
-        applyBubbleMask(tailX: w / 2)
+        // Speech-bubble body: a rounded glass panel. The tail is a plain flat-color triangle, not
+        // glass — NSGlassEffectView's compositing didn't preserve a rotated square as a crisp
+        // diamond (it kept collapsing to a plain rounded stub), and it's a 16pt sliver where the
+        // backdrop is nearly uniform anyway, so a solid triangle in the same tint reads as one piece.
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
+
+        // Tint rather than leaving it purely backdrop-driven — otherwise a dark wallpaper renders
+        // the glass dark even in Light mode, clashing with the (light-mode) control colors on top.
+        // Kept fairly opaque since macOS also dims translucent materials when the window isn't key.
+        let tint = NSColor.windowBackgroundColor.withAlphaComponent(0.9)
+
+        let tw = ProjectPromptWindow.tailWidth
+        let th = ProjectPromptWindow.tailHeight
+        tailView = TriangleView(frame: NSRect(x: w / 2 - tw / 2, y: h - 1, width: tw, height: th + 1))
+        tailView.fillColor = tint
+        root.addSubview(tailView)
+
+        glassContainer = NSGlassEffectContainerView(frame: NSRect(x: 0, y: 0, width: w, height: fullH))
+        body = NSView(frame: glassContainer.bounds)
+        glassContainer.contentView = body
+
+        mainGlass = NSGlassEffectView(frame: NSRect(x: 0, y: 0, width: w, height: h))
+        mainGlass.cornerRadius = ProjectPromptWindow.cornerRadius
+        mainGlass.tintColor = tint
+        body.addSubview(mainGlass)
+
+        // Sits above tailView so only the tip poking out past the top edge is visible.
+        root.addSubview(glassContainer)
 
         // MARK: Input view
 
@@ -130,34 +162,19 @@ class ProjectPromptWindow: NSPanel {
 
         idleContainer = tappable
 
-        blur.addSubview(inputContainer)
-        blur.addSubview(idleContainer)
-        contentView = blur
+        root.addSubview(inputContainer)
+        root.addSubview(idleContainer)
+
+        contentView = root
     }
 
-    /// Masks `blur` into a rounded-rect speech bubble with a triangular tail on top, apex at `tailX`.
-    private func applyBubbleMask(tailX: CGFloat) {
+    /// Repositions `tailView` under the given screen-icon x, in body-local coordinates.
+    private func positionTail(apexX: CGFloat) {
         let w = ProjectPromptWindow.W
-        let h = ProjectPromptWindow.H
-        let r = ProjectPromptWindow.cornerRadius
         let tw = ProjectPromptWindow.tailWidth
-        let th = ProjectPromptWindow.tailHeight
-
-        let minTailX = r + tw / 2
-        let maxTailX = w - r - tw / 2
-        let apexX = min(max(tailX, minTailX), maxTailX)
-
-        let path = NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: w, height: h), xRadius: r, yRadius: r)
-        let tail = NSBezierPath()
-        tail.move(to: NSPoint(x: apexX - tw / 2, y: h))
-        tail.line(to: NSPoint(x: apexX, y: h + th))
-        tail.line(to: NSPoint(x: apexX + tw / 2, y: h))
-        tail.close()
-        path.append(tail)
-
-        let mask = CAShapeLayer()
-        mask.path = path.toCGPath()
-        blur.layer?.mask = mask
+        let margin = ProjectPromptWindow.cornerRadius + tw / 2
+        let clampedX = min(max(apexX, margin), w - margin)
+        tailView.frame.origin.x = clampedX - tw / 2
     }
 
     private func activate() {
@@ -168,6 +185,8 @@ class ProjectPromptWindow: NSPanel {
     }
 
     func show(startActive: Bool = false, anchor: NSRect? = nil) {
+        syncAppearance()
+
         if startActive {
             idleContainer.isHidden = true
             inputContainer.isHidden = false
@@ -192,7 +211,7 @@ class ProjectPromptWindow: NSPanel {
         let y = iconBottomY - h - th - 4
         setFrameOrigin(NSPoint(x: x, y: y))
 
-        applyBubbleMask(tailX: iconCenterX - x)
+        positionTail(apexX: iconCenterX - x)
 
         orderFrontRegardless()
         if startActive {
@@ -230,22 +249,17 @@ class ProjectPromptWindow: NSPanel {
     }
 }
 
-private extension NSBezierPath {
-    /// macOS 13 has no `cgPath` on NSBezierPath (added in 14) — build one by hand.
-    func toCGPath() -> CGPath {
-        let path = CGMutablePath()
-        var points = [NSPoint](repeating: .zero, count: 3)
-        for i in 0..<elementCount {
-            switch element(at: i, associatedPoints: &points) {
-            case .moveTo: path.move(to: points[0])
-            case .lineTo: path.addLine(to: points[0])
-            case .curveTo, .cubicCurveTo: path.addCurve(to: points[2], control1: points[0], control2: points[1])
-            case .quadraticCurveTo: path.addQuadCurve(to: points[1], control: points[0])
-            case .closePath: path.closeSubpath()
-            @unknown default: break
-            }
-        }
-        return path
+private class TriangleView: NSView {
+    var fillColor: NSColor = .clear { didSet { needsDisplay = true } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: 0, y: 0))
+        path.line(to: NSPoint(x: bounds.width, y: 0))
+        path.line(to: NSPoint(x: bounds.width / 2, y: bounds.height))
+        path.close()
+        fillColor.setFill()
+        path.fill()
     }
 }
 
