@@ -1,0 +1,5 @@
+actually the "contains" was fine, I just want it all to be case insensitive
+
+---
+
+Build and restart using the script
