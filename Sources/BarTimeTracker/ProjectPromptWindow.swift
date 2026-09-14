@@ -6,6 +6,7 @@ class ProjectPromptWindow: NSPanel {
     var onDismiss: (() -> Void)?
 
     private var comboBox: NSComboBox!
+    private var knownProjects: [String] = []
     private var idleContainer: NSView!
     private var inputContainer: NSView!
     private var glassContainer: NSGlassEffectContainerView!
@@ -114,6 +115,9 @@ class ProjectPromptWindow: NSPanel {
         comboBox.hasVerticalScroller = true
         comboBox.target = self
         comboBox.action = #selector(saveAction)
+        comboBox.delegate = self
+
+        knownProjects = recentProjects
 
         if !recentProjects.isEmpty { comboBox.addItems(withObjectValues: recentProjects) }
         if !currentProject.isEmpty { comboBox.stringValue = currentProject }
@@ -257,6 +261,20 @@ class ProjectPromptWindow: NSPanel {
     private func dismiss() {
         close()
         onDismiss?()
+    }
+}
+
+// MARK: - Case-insensitive completion
+
+extension ProjectPromptWindow: NSComboBoxDelegate {
+    /// The built-in completion only matches how the project happened to be capitalised, so typing "f" never finds
+    /// "Fineasity". Match lowercased instead — prefix first, then anything containing the text — and the completion
+    /// carries the stored capitalisation back into the field, so one project cannot be logged under two spellings.
+    func comboBox(_ comboBox: NSComboBox, completedString string: String) -> String? {
+        let typed = string.lowercased()
+        guard !typed.isEmpty else { return nil }
+        if let prefixMatch = knownProjects.first(where: { $0.lowercased().hasPrefix(typed) }) { return prefixMatch }
+        return knownProjects.first(where: { $0.lowercased().contains(typed) })
     }
 }
 
