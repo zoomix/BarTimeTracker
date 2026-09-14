@@ -1,0 +1,3 @@
+Great. Commit!
+
+Please make the search case insensitive. If there's a project called Fineasity i want to be able to surface it when i type "f". Currently I have to remember what case the project happened to be in
