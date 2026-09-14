@@ -1,0 +1,5 @@
+Check out todays output. Why does it start at 01:04?
+
+---
+
+We're going withn 2. Never drop recordings, that destroys data. Only the human operator can do that.

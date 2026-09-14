@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.10.4",
+  "checkpoint_id": "b2f1b4d90933",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "Sources/BarTimeTracker/AppDelegate.swift",
+    "Sources/BarTimeTrackerCore/TimeCalculations.swift",
+    "Tests/BarTimeTrackerTests/EventLogCalculationTests+Jun1.swift",
+    "Tests/BarTimeTrackerTests/EventLogCalculationTests.swift",
+    "Tests/BarTimeTrackerTests/TimeCalculatorTests.swift"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b2/f1b4d90933/0/metadata.json",
+      "transcript": "/b2/f1b4d90933/0/full.jsonl",
+      "compact_transcript": "/b2/f1b4d90933/0/transcript.jsonl",
+      "content_hash": "/b2/f1b4d90933/0/content_hash.txt",
+      "prompt": "/b2/f1b4d90933/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 42217,
+    "cache_read_tokens": 1606389,
+    "output_tokens": 8895,
+    "api_call_count": 27
+  }
+}
