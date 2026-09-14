@@ -119,7 +119,7 @@ extension EventLogCalculationTests {
             return "\(start) - \(end)  \(project)"
         }.joined(separator: "\n")
         XCTAssertEqual(actual, """
-            01:17 - 07:54  Break
+            07:14 - 07:54  Break
             07:54 - 08:25  Fineasity
             08:25 - 08:40  apps.qamcom.se
             08:40 - 08:55  Librixer

@@ -89,7 +89,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr15_workedTime() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr15Events, projectEntries: apr15Projects, now: apr15Now)
-        let firstOn = apr15Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr15Events, projectEntries: apr15Projects)
         let worked = TimeCalculations.workedTime(spans: spans, entries: apr15Projects,
                                                  firstOnTime: firstOn, now: apr15Now)
         // 8h 43m 20s
@@ -99,7 +99,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr15_projectDurations() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr15Events, projectEntries: apr15Projects, now: apr15Now)
-        let firstOn = apr15Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr15Events, projectEntries: apr15Projects)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: apr15Projects,
                                                          firstOnTime: firstOn, now: apr15Now)
         let byName = Dictionary(uniqueKeysWithValues: totals.map { ($0.project, $0.duration) })
@@ -195,7 +195,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr16_workedTime() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr16Events, projectEntries: apr16Projects, now: apr16Now)
-        let firstOn = apr16Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr16Events, projectEntries: apr16Projects)
         let worked = TimeCalculations.workedTime(spans: spans, entries: apr16Projects,
                                                  firstOnTime: firstOn, now: apr16Now)
         // 7h 18m 13s
@@ -205,7 +205,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr16_projectDurations() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr16Events, projectEntries: apr16Projects, now: apr16Now)
-        let firstOn = apr16Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr16Events, projectEntries: apr16Projects)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: apr16Projects,
                                                          firstOnTime: firstOn, now: apr16Now)
         let byName = Dictionary(uniqueKeysWithValues: totals.map { ($0.project, $0.duration) })
@@ -293,17 +293,17 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr17_workedTime() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr17Events, projectEntries: apr17Projects, now: apr17Now)
-        let firstOn = apr17Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr17Events, projectEntries: apr17Projects)
         let worked = TimeCalculations.workedTime(spans: spans, entries: apr17Projects,
                                                  firstOnTime: firstOn, now: apr17Now)
-        // 9h 19m 7s
-        XCTAssertDuration(worked, 33547)
+        // 9h 19m 28s
+        XCTAssertDuration(worked, 33568)
     }
 
     func test_apr17_projectDurations() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr17Events, projectEntries: apr17Projects, now: apr17Now)
-        let firstOn = apr17Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr17Events, projectEntries: apr17Projects)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: apr17Projects,
                                                          firstOnTime: firstOn, now: apr17Now)
         let byName = Dictionary(uniqueKeysWithValues: totals.map { ($0.project, $0.duration) })
@@ -348,7 +348,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr19_workedTime_isZero() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr19Events, projectEntries: apr19Projects, now: apr19Now)
-        let firstOn = apr19Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr19Events, projectEntries: apr19Projects)
         let worked = TimeCalculations.workedTime(spans: spans, entries: apr19Projects,
                                                  firstOnTime: firstOn, now: apr19Now)
         XCTAssertEqual(worked, 0)
@@ -357,7 +357,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr19_noProjectTotals() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr19Events, projectEntries: apr19Projects, now: apr19Now)
-        let firstOn = apr19Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr19Events, projectEntries: apr19Projects)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: apr19Projects,
                                                          firstOnTime: firstOn, now: apr19Now)
         XCTAssertTrue(totals.isEmpty)
@@ -424,7 +424,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr20_workedTime() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr20Events, projectEntries: apr20Projects, now: apr20Now)
-        let firstOn = apr20Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr20Events, projectEntries: apr20Projects)
         let worked = TimeCalculations.workedTime(spans: spans, entries: apr20Projects,
                                                  firstOnTime: firstOn, now: apr20Now)
         // 4h 9m 6s
@@ -434,7 +434,7 @@ final class TimeCalculatorTests: XCTestCase {
     func test_apr20_projectDurations() {
         let spans = TimeCalculations.buildTimeSpans(
             from: apr20Events, projectEntries: apr20Projects, now: apr20Now)
-        let firstOn = apr20Events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: apr20Events, projectEntries: apr20Projects)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: apr20Projects,
                                                          firstOnTime: firstOn, now: apr20Now)
         let byName = Dictionary(uniqueKeysWithValues: totals.map { ($0.project, $0.duration) })

@@ -28,7 +28,7 @@ class EventLogCalculationTests: XCTestCase {
     ) {
         let (screenEvents, projectEntries) = EventLogParser.parse(csv: csv, timeZone: Self.tz)
         let entries = projectEntries.filter { !$0.project.hasPrefix("~") }
-        let firstOn = screenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = TimeCalculations.dayStartTime(events: screenEvents, projectEntries: entries)
         let spans = TimeCalculations.buildTimeSpans(from: screenEvents, projectEntries: entries, now: now)
         let worked = TimeCalculations.workedTime(spans: spans, entries: entries, firstOnTime: firstOn, now: now)
         let totals = TimeCalculations.dailyProjectTotals(spans: spans, entries: entries, firstOnTime: firstOn, now: now)

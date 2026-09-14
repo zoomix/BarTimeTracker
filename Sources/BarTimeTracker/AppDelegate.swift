@@ -455,7 +455,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
             let dayProjects = appData.projectEntries
                 .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
                 .sorted { $0.time < $1.time }
-            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+            let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
             let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
             let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
             guard worked > 30 * 60 else { continue }
@@ -475,7 +475,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
         let dayProjects = appData.projectEntries
             .filter { cal.isDate($0.time, inSameDayAs: date) && !$0.project.hasPrefix("~") }
             .sorted { $0.time < $1.time }
-        let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
 
         let now = Date()
         let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
@@ -721,7 +721,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
             let dayProjects = appData.projectEntries
                 .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
                 .sorted { $0.time < $1.time }
-            let firstOnTime = dayScreenEvents.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+            let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
             let dayStart = firstOnTime ?? day
             let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: Date())
             let dateStr = dateFmt.string(from: day)

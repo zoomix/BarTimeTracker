@@ -57,9 +57,23 @@ public struct ProjectDuration {
 
 public enum TimeCalculations {
 
+    /// Start of the day's first real work session.
+    ///
+    /// A sleeping Mac wakes for maintenance several times a night (an `on` immediately followed by an `off`),
+    /// so the day's first `on` event is usually a dark wake hours before anyone sat down. Instead anchor to the
+    /// wake that begins the uninterrupted session containing the first project entry, clamped to that entry
+    /// (the entry is occasionally logged a few seconds before the wake it belongs to).
+    public static func dayStartTime(events: [ScreenEvent], projectEntries: [ProjectEntry]) -> Date? {
+        let wakes = events.filter { $0.kind == .on || $0.kind == .screensaverOff }
+        guard let firstEntry = projectEntries.first?.time else { return wakes.first?.time }
+        guard let lastOff = events.last(where: { $0.kind == .off && $0.time < firstEntry })?.time else { return wakes.first?.time }
+        guard let sessionWake = wakes.first(where: { $0.time > lastOff })?.time else { return firstEntry }
+        return min(sessionWake, firstEntry)
+    }
+
     /// Build logical work spans driven by project-entry transitions.
     /// Each run of consecutive same-project entries forms one span.
-    /// Span start = end of previous span (or first screen-on for the first span).
+    /// Span start = end of previous span (or the day's first session wake for the first span).
     /// Span end = first away event (off/screensaverOn) at or after the last entry of the
     /// group but before the next group starts; falls back to the last entry time if none.
     /// The last span is active when no away event follows its last entry.
@@ -71,7 +85,7 @@ public enum TimeCalculations {
     ) -> [TimeSpan] {
         guard !projectEntries.isEmpty else { return [] }
 
-        let firstOn = events.first(where: { $0.kind == .on || $0.kind == .screensaverOff })?.time
+        let firstOn = dayStartTime(events: events, projectEntries: projectEntries)
 
         // Group consecutive same-project entries into (project, firstTime, lastTime)
         var groupProjects: [String] = []
