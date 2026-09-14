@@ -135,6 +135,26 @@ extension EventLogCalculationTests {
     }
 
 
+    func test_jun1_workPeriods() {
+        let (screenEvents, projectEntries) = EventLogParser.parse(csv: Self.csv_jun1, timeZone: Self.tz)
+        let entries = projectEntries.filter { !$0.project.hasPrefix("~") }
+        let firstOn = TimeCalculations.dayStartTime(events: screenEvents, projectEntries: entries)
+        let periods = TimeCalculations.buildWorkPeriods(from: screenEvents, projectEntries: entries, now: Self.now_jun1)
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        fmt.timeZone = Self.tz
+        let actual = periods.map { p in
+            let end = p.end ?? Self.now_jun1
+            let durations = TimeCalculations.projectDurations(entries: entries, firstOnTime: firstOn, spanStart: p.start, spanEnd: end)
+            let projects = durations.map { "\($0.project) \(Int($0.duration / 60))m" }.joined(separator: ", ")
+            return "\(fmt.string(from: p.start)) - \(fmt.string(from: end))  [\(projects)]"
+        }.joined(separator: "\n")
+        XCTAssertEqual(actual, """
+            07:54 - 12:44  [apps.qamcom.se 152m, Fineasity 106m, Stena sälj 15m, Librixer 15m]
+            13:11 - 18:10  [apps.qamcom.se 281m, Break 16m]
+            """.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
     func test_jun1_allClosed() {
         XCTAssertTrue(analyze(csv: Self.csv_jun1, now: Self.now_jun1).spans.allSatisfy { !$0.isActive })
     }

@@ -480,17 +480,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
         let now = Date()
         let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
         let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
+        // Rows are work periods (break to break), not one row per project switch.
+        let periods = TimeCalculations.buildWorkPeriods(from: dayScreenEvents, projectEntries: dayProjects, now: now)
 
         let totalItem = NSMenuItem(title: "Worked: \(formatDuration(worked))", action: nil, keyEquivalent: "")
         totalItem.isEnabled = false
         menu.addItem(totalItem)
         menu.addItem(.separator())
-        if spans.isEmpty {
+        if periods.isEmpty {
             let item = NSMenuItem(title: "No events yet", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            for span in spans {
+            for span in periods {
                 let spanEnd = span.end ?? Date()
                 guard Int(spanEnd.timeIntervalSince(span.start) / 60) > 0 else { continue }
                 let startStr = timeFmt.string(from: span.start)

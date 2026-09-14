@@ -157,10 +157,57 @@ public enum TimeCalculations {
         return spans
     }
 
+    /// Work periods: the stretches actually spent working, regardless of how many projects were touched.
+    /// A period runs until a Break or until the computer is away long enough to count as an absence,
+    /// so switching project mid-morning does not start a new period.
+    public static func buildWorkPeriods(
+        from events: [ScreenEvent],
+        projectEntries: [ProjectEntry],
+        absenceThreshold: TimeInterval = 5 * 60,
+        now: Date
+    ) -> [TimeSpan] {
+        guard !projectEntries.isEmpty else { return [] }
+
+        // Collapse every project to Work/Break so spans break only on that distinction.
+        let collapsed = projectEntries.map { ProjectEntry(project: $0.project == "Break" ? "Break" : "Work", time: $0.time) }
+        let spans = buildTimeSpans(from: events, projectEntries: collapsed, now: now)
+
+        var groupProjects: [String] = []
+        for entry in collapsed where groupProjects.last != entry.project {
+            groupProjects.append(entry.project)
+        }
+        guard groupProjects.count == spans.count else { return spans }
+
+        var periods: [TimeSpan] = []
+        for (project, span) in zip(groupProjects, spans) where project != "Break" {
+            periods.append(contentsOf: splitOnAbsences(span: span, events: events, threshold: absenceThreshold, now: now))
+        }
+        return periods
+    }
+
+    /// Cut a span wherever the computer was off longer than `threshold` — an unreported absence.
+    private static func splitOnAbsences(span: TimeSpan, events: [ScreenEvent], threshold: TimeInterval, now: Date) -> [TimeSpan] {
+        let end = span.end ?? now
+        var result: [TimeSpan] = []
+        var start = span.start
+
+        for off in events where off.kind == .off && off.time > start && off.time < end {
+            guard off.time > start else { continue }
+            guard let wake = events.first(where: { ($0.kind == .on || $0.kind == .screensaverOff) && $0.time > off.time }) else { continue }
+            guard wake.time < end, wake.time.timeIntervalSince(off.time) >= threshold else { continue }
+            result.append(TimeSpan(start: start, end: off.time, isActive: false))
+            start = wake.time
+        }
+
+        result.append(TimeSpan(start: start, end: span.end, isActive: span.isActive))
+        return result
+    }
+
     /// Time attributed to each project within [spanStart, spanEnd].
     /// Entry[i] claims [entry[i-1].time, entry[i].time], intersected with the span.
     /// The last entry additionally claims forward to spanEnd.
-    /// Results with < 30 s are dropped (noise).
+    /// Results with < 30 s are dropped (noise). Equal durations are ordered by who started first in the span,
+    /// so the listing is stable rather than dictionary order.
     public static func projectDurations(
         entries: [ProjectEntry],
         firstOnTime: Date?,
@@ -171,6 +218,7 @@ public enum TimeCalculations {
 
         let dayStart = firstOnTime ?? entries[0].time
         var durations: [String: TimeInterval] = [:]
+        var firstClaim: [String: Date] = [:]
 
         for i in 0..<entries.count {
             let entry = entries[i]
@@ -179,6 +227,7 @@ public enum TimeCalculations {
             let intEnd   = min(entry.time, spanEnd)
             if intEnd > intStart {
                 durations[entry.project, default: 0] += intEnd.timeIntervalSince(intStart)
+                firstClaim[entry.project] = min(firstClaim[entry.project] ?? intStart, intStart)
             }
         }
 
@@ -186,13 +235,19 @@ public enum TimeCalculations {
             let intStart = max(last.time, spanStart)
             if spanEnd > intStart {
                 durations[last.project, default: 0] += spanEnd.timeIntervalSince(intStart)
+                firstClaim[last.project] = min(firstClaim[last.project] ?? intStart, intStart)
             }
         }
 
         return durations
             .map { ProjectDuration(project: $0.key, duration: $0.value) }
             .filter { $0.duration >= 30 }
-            .sorted { $0.duration > $1.duration }
+            .sorted { a, b in
+                guard a.duration == b.duration else { return a.duration > b.duration }
+                let aStart = firstClaim[a.project] ?? spanStart
+                let bStart = firstClaim[b.project] ?? spanStart
+                return aStart == bStart ? a.project < b.project : aStart < bStart
+            }
     }
 
     /// Worked time = span duration minus break-attributed time within each span.
@@ -230,7 +285,7 @@ public enum TimeCalculations {
         }
         return totals
             .map { ProjectDuration(project: $0.key, duration: $0.value) }
-            .sorted { $0.duration > $1.duration }
+            .sorted { $0.duration == $1.duration ? $0.project < $1.project : $0.duration > $1.duration }
     }
 
     public static func formatDuration(_ interval: TimeInterval) -> String {
