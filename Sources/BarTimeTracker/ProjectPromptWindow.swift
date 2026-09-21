@@ -50,6 +50,26 @@ class ProjectPromptWindow: NSPanel {
     private func syncAppearance() {
         let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
         appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+        applyTint()
+    }
+
+    /// The bubble's tint has to be resolved by hand: `mainGlass.tintColor` snapshots whatever the
+    /// dynamic colour resolved to when it was set, and at init time that's the app's appearance, not
+    /// the one we just forced on the panel — which left a light bubble carrying dark-mode controls.
+    private func applyTint() {
+        guard let mainGlass, let tailView else { return }
+        let tint = resolvedTint()
+        mainGlass.tintColor = tint
+        tailView.fillColor = tint
+    }
+
+    private func resolvedTint() -> NSColor {
+        var resolved = NSColor.windowBackgroundColor
+        let panelAppearance: NSAppearance = self.appearance ?? NSAppearance.currentDrawing()
+        panelAppearance.performAsCurrentDrawingAppearance {
+            resolved = NSColor.windowBackgroundColor.usingColorSpace(.sRGB) ?? resolved
+        }
+        return resolved.withAlphaComponent(0.9)
     }
 
     private func buildUI(currentProject: String, recentProjects: [String]) {
@@ -66,7 +86,7 @@ class ProjectPromptWindow: NSPanel {
         // Tint rather than leaving it purely backdrop-driven — otherwise a dark wallpaper renders
         // the glass dark even in Light mode, clashing with the (light-mode) control colors on top.
         // Kept fairly opaque since macOS also dims translucent materials when the window isn't key.
-        let tint = NSColor.windowBackgroundColor.withAlphaComponent(0.9)
+        let tint = resolvedTint()
 
         let tw = ProjectPromptWindow.tailWidth
         let th = ProjectPromptWindow.tailHeight
