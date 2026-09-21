@@ -164,11 +164,18 @@ class WeekTimelineWindow: NSWindow {
     private var dayHeaderView: DayNameHeaderView!
     private var daySummaryView: DaySummaryView!
     private var weekNavControl: NSSegmentedControl!
+    private var modeControl: NSSegmentedControl!
     private var todayBtn: NSButton!
     private var scrollView: NSScrollView!
+    private var reportScrollView: NSScrollView!
+    private var reportView: ReportView!
+
+    private enum ViewMode: Int { case calendar = 0, report = 1 }
+    private var viewMode: ViewMode = .calendar
 
     private let topBarH: CGFloat = 0
     private let namesH: CGFloat = 28
+    private let groupsDefaultsKey = "reportProjectGroups"
 
     init(dataStore: TimeDataStore) {
         self.dataStore = dataStore
@@ -190,7 +197,18 @@ class WeekTimelineWindow: NSWindow {
         let accessory = NSTitlebarAccessoryViewController()
         accessory.layoutAttribute = .right
 
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 214, height: 32))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 368, height: 32))
+
+        modeControl = NSSegmentedControl(
+            labels: ["Calendar", "Report"],
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(changeViewMode(_:))
+        )
+        modeControl.segmentStyle = .texturedRounded
+        modeControl.controlSize = .small
+        modeControl.selectedSegment = 0
+        modeControl.frame = NSRect(x: 0, y: 2, width: 146, height: 28)
 
         weekNavControl = NSSegmentedControl(
             labels: ["Previous", "Next"],
@@ -202,12 +220,13 @@ class WeekTimelineWindow: NSWindow {
         weekNavControl.controlSize = .small
         weekNavControl.setWidth(78, forSegment: 0)
         weekNavControl.setWidth(54, forSegment: 1)
-        weekNavControl.frame = NSRect(x: 0, y: 2, width: 132, height: 28)
+        weekNavControl.frame = NSRect(x: 154, y: 2, width: 132, height: 28)
 
-        todayBtn = actionButton("This Week", #selector(goToCurrentWeek), NSRect(x: 138, y: 2, width: 76, height: 28))
+        todayBtn = actionButton("This Week", #selector(goToCurrentWeek), NSRect(x: 292, y: 2, width: 76, height: 28))
         todayBtn.keyEquivalent = "0"
         todayBtn.keyEquivalentModifierMask = [.command]
 
+        container.addSubview(modeControl)
         container.addSubview(weekNavControl)
         container.addSubview(todayBtn)
         accessory.view = container
@@ -252,6 +271,31 @@ class WeekTimelineWindow: NSWindow {
         scrollView.documentView = timelineView
         cv.addSubview(scrollView)
 
+        reportScrollView = NSScrollView(frame: cv.bounds)
+        reportScrollView.autoresizingMask = [.width, .height]
+        reportScrollView.hasVerticalScroller = true
+        reportScrollView.autohidesScrollers = true
+        reportScrollView.borderType = .noBorder
+        reportScrollView.drawsBackground = false
+        reportScrollView.isHidden = true
+
+        reportView = ReportView(frame: NSRect(x: 0, y: 0, width: w, height: cv.bounds.height))
+        reportView.autoresizingMask = .width
+        reportView.onGroupsChanged = { [weak self] groups in
+            self?.saveGroups(groups)
+            self?.resizeReportView()
+        }
+        reportScrollView.documentView = reportView
+        cv.addSubview(reportScrollView)
+
+        reportScrollView.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(resizeReportView),
+            name: NSView.frameDidChangeNotification,
+            object: reportScrollView.contentView
+        )
+
         DispatchQueue.main.async { [weak self] in
             guard let sv = self?.scrollView else { return }
             sv.contentView.scroll(to: NSPoint(x: 0, y: yFor(min: defaultScrollHour * 60)))
@@ -286,6 +330,31 @@ class WeekTimelineWindow: NSWindow {
             break
         }
         sender.selectedSegment = -1
+    }
+
+    @objc private func changeViewMode(_ sender: NSSegmentedControl) {
+        guard let mode = ViewMode(rawValue: sender.selectedSegment), mode != viewMode else { return }
+        viewMode = mode
+        applyViewMode()
+    }
+
+    private func applyViewMode() {
+        let report = viewMode == .report
+        dayHeaderView.isHidden = report
+        daySummaryView.isHidden = report
+        scrollView.isHidden = report
+        reportScrollView.isHidden = !report
+        title = report ? "Week Report" : "Week View"
+        layoutSummaryAndScroll()
+    }
+
+    private func loadGroups() -> [[String]] {
+        let raw = UserDefaults.standard.array(forKey: groupsDefaultsKey) as? [[String]] ?? []
+        return raw.filter { $0.count > 1 }
+    }
+
+    private func saveGroups(_ groups: [[String]]) {
+        UserDefaults.standard.set(groups, forKey: groupsDefaultsKey)
     }
 
     @objc private func prevWeek() {
@@ -336,6 +405,20 @@ class WeekTimelineWindow: NSWindow {
         subtitle = "\(a) – \(fmt.string(from: days[6]))"
         updateNavigationControls()
 
+        var perProject: [String: [TimeInterval]] = [:]
+        for (i, col) in columns.enumerated() {
+            let totals = TimeCalculations.dailyProjectTotals(
+                spans: col.logicalSpans,
+                entries: col.projects,
+                firstOnTime: col.visualSpans.first?.start,
+                now: now
+            )
+            for t in totals where !t.project.hasPrefix("~") {
+                perProject[t.project, default: Array(repeating: 0, count: 7)][i] += t.duration
+            }
+        }
+        reportView.update(dates: days, perProject: perProject, groups: loadGroups())
+
         dayHeaderView.days = days; dayHeaderView.needsDisplay = true
         daySummaryView.update(columns: columns, now: now)
         timelineView.columns = columns; timelineView.showNow = weekOffset == 0
@@ -365,6 +448,16 @@ class WeekTimelineWindow: NSWindow {
             height: h - topBarH - namesH - summaryH
         )
         daySummaryView.needsDisplay = true
+
+        reportScrollView.frame = cv.bounds
+        resizeReportView()
+    }
+
+    @objc private func resizeReportView() {
+        let size = reportScrollView.contentSize
+        reportView.frame.size.width = size.width
+        reportView.frame.size.height = max(size.height, reportView.intrinsicHeight())
+        reportView.needsDisplay = true
     }
 
     func addEntry(date: Date, project: String) {
@@ -1065,5 +1158,394 @@ private class TimelineContentView: NSView {
         comps.hour = mins / 60; comps.minute = mins % 60; comps.second = 0
         guard let date = cal.date(from: comps) else { return nil }
         return (date, idx)
+    }
+}
+
+// MARK: - Report view (projects × days)
+
+private let reportLabelColW: CGFloat = 210
+private let reportTotalColW: CGFloat = 70
+private let reportHeaderH: CGFloat = 28
+private let reportRowH: CGFloat = 28
+private let reportMemberRowH: CGFloat = 20
+private let reportRowGap: CGFloat = 6
+private let reportSidePad: CGFloat = 10
+
+/// One rendered line of the report: either a single project, or a group of
+/// projects whose hours are summed into one set of day cells.
+private struct ReportRowLayout {
+    let members: [String]
+    let frame: CGRect
+    let headerRect: CGRect
+    let labelRects: [(project: String, rect: CGRect)]
+    var isGroup: Bool { members.count > 1 }
+}
+
+/// Reporting-oriented flip of the calendar: one row per project (or per group of
+/// projects dragged together), one column per day. Rows are labelled on the right,
+/// which is the order the time-reporting tool asks for them.
+private class ReportView: NSView {
+
+    private var dates: [Date] = []
+    private var perProject: [String: [TimeInterval]] = [:]
+    private var order: [String] = []
+    private var groups: [[String]] = []
+
+    var onGroupsChanged: (([[String]]) -> Void)?
+
+    // Drag state
+    private var dragProject: String? = nil
+    private var dragStart: CGPoint = .zero
+    private var dragPoint: CGPoint = .zero
+    private var dragActive = false
+    private var dropTarget: String? = nil
+
+    override var isFlipped: Bool { true }
+
+    private let dayFmt: DateFormatter = { let f = DateFormatter(); f.dateFormat = "EEE d"; return f }()
+
+    func update(dates: [Date], perProject: [String: [TimeInterval]], groups: [[String]]) {
+        self.dates = dates
+        self.perProject = perProject
+        self.groups = groups.map { $0.filter { perProject[$0] != nil } }.filter { $0.count > 1 }
+        self.order = perProject.keys.sorted { a, b in
+            let ta = perProject[a]!.reduce(0, +), tb = perProject[b]!.reduce(0, +)
+            return ta == tb ? a < b : ta > tb
+        }
+        needsDisplay = true
+    }
+
+    // MARK: Geometry
+
+    private var dayAreaW: CGFloat { max(0, bounds.width - reportLabelColW - reportTotalColW) }
+    private var colW: CGFloat { dayAreaW / 7 }
+    private var labelColX: CGFloat { 0 }
+    private func dayX(_ i: Int) -> CGFloat { reportLabelColW + CGFloat(i) * colW }
+    private var totalColX: CGFloat { reportLabelColW + dayAreaW }
+
+    /// The rows in draw order: a project that belongs to a group is drawn as part
+    /// of that group, at the position of its highest-ranked member.
+    private func rowGroups() -> [[String]] {
+        var groupOf: [String: Int] = [:]
+        for (i, g) in groups.enumerated() {
+            for p in g { groupOf[p] = i }
+        }
+        var emitted = Set<Int>()
+        var rows: [[String]] = []
+        for project in order {
+            if let gi = groupOf[project] {
+                guard !emitted.contains(gi) else { continue }
+                emitted.insert(gi)
+                rows.append(order.filter { groupOf[$0] == gi })
+            } else {
+                rows.append([project])
+            }
+        }
+        return rows
+    }
+
+    private func layoutRows() -> [ReportRowLayout] {
+        var y = reportHeaderH + reportRowGap
+        var result: [ReportRowLayout] = []
+        for members in rowGroups() {
+            let membersH = members.count > 1 ? CGFloat(members.count) * reportMemberRowH : 0
+            let frame = CGRect(x: 0, y: y, width: bounds.width, height: reportRowH + membersH)
+            let headerRect = CGRect(x: 0, y: y, width: bounds.width, height: reportRowH)
+
+            var labelRects: [(String, CGRect)] = []
+            if members.count > 1 {
+                var my = y + reportRowH
+                for m in members {
+                    labelRects.append((m, CGRect(x: labelColX + reportSidePad + 12, y: my, width: reportLabelColW - reportSidePad * 2 - 12, height: reportMemberRowH)))
+                    my += reportMemberRowH
+                }
+            } else {
+                labelRects.append((members[0], CGRect(x: labelColX + reportSidePad, y: y, width: reportLabelColW - reportSidePad * 2, height: reportRowH)))
+            }
+
+            result.append(ReportRowLayout(members: members, frame: frame, headerRect: headerRect, labelRects: labelRects))
+            y += frame.height + reportRowGap
+        }
+        return result
+    }
+
+    func intrinsicHeight() -> CGFloat {
+        let rows = layoutRows()
+        let bottom = rows.last?.frame.maxY ?? reportHeaderH
+        return bottom + reportRowGap + reportRowH + 12
+    }
+
+    // MARK: Draw
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.controlBackgroundColor.setFill(); dirtyRect.fill()
+        guard colW > 0 else { return }
+
+        drawHeader()
+        let rows = layoutRows()
+        for row in rows { drawRow(row) }
+        drawFooter(below: rows)
+
+        // Column separators run the full height so the grid reads as a table.
+        NSColor.separatorColor.withAlphaComponent(0.15).setFill()
+        for i in 1..<8 { NSRect(x: dayX(i), y: 0, width: 0.5, height: bounds.height).fill() }
+        NSColor.separatorColor.withAlphaComponent(0.3).setFill()
+        NSRect(x: dayX(0), y: 0, width: 0.5, height: bounds.height).fill()
+
+        if dragActive, let proj = dragProject { drawDragGhost(proj) }
+    }
+
+    private func drawHeader() {
+        NSColor.windowBackgroundColor.setFill()
+        NSRect(x: 0, y: 0, width: bounds.width, height: reportHeaderH).fill()
+
+        for (i, day) in dates.enumerated() {
+            let isToday = cal.isDateInToday(day)
+            if isToday {
+                NSColor.controlAccentColor.withAlphaComponent(0.1).setFill()
+                NSRect(x: dayX(i), y: 0, width: colW, height: reportHeaderH).fill()
+            }
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 11, weight: isToday ? .bold : .medium),
+                .foregroundColor: isToday ? NSColor.controlAccentColor : NSColor.labelColor
+            ]
+            drawCentered(dayFmt.string(from: day), in: CGRect(x: dayX(i), y: 0, width: colW, height: reportHeaderH), attrs: attrs)
+        }
+
+        let headAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        drawCentered("Total", in: CGRect(x: totalColX, y: 0, width: reportTotalColW, height: reportHeaderH), attrs: headAttrs)
+        let projStr = NSAttributedString(string: "Project", attributes: headAttrs)
+        projStr.draw(at: NSPoint(x: labelColX + reportSidePad, y: (reportHeaderH - projStr.size().height) / 2))
+
+        NSColor.separatorColor.setFill()
+        NSRect(x: 0, y: reportHeaderH - 0.5, width: bounds.width, height: 0.5).fill()
+    }
+
+    private func dailySum(_ members: [String], day: Int) -> TimeInterval {
+        members.reduce(0.0) { $0 + (perProject[$1]?[day] ?? 0) }
+    }
+
+    private func drawRow(_ row: ReportRowLayout) {
+        let accent = projectColor(row.members[0])
+
+        if row.isGroup {
+            accent.withAlphaComponent(0.1).setFill()
+            NSBezierPath(roundedRect: row.frame.insetBy(dx: 2, dy: 0), xRadius: 6, yRadius: 6).fill()
+            accent.withAlphaComponent(0.45).setStroke()
+            let border = NSBezierPath(roundedRect: row.frame.insetBy(dx: 2.5, dy: 0.5), xRadius: 6, yRadius: 6)
+            border.lineWidth = 1
+            border.stroke()
+        }
+
+        if dropTarget != nil && row.members.contains(dropTarget!) {
+            NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
+            NSBezierPath(roundedRect: row.frame.insetBy(dx: 2, dy: 0), xRadius: 6, yRadius: 6).fill()
+        }
+
+        // Day cells
+        for i in 0..<7 {
+            let seconds = dailySum(row.members, day: i)
+            drawHourCell(CGRect(x: dayX(i), y: row.headerRect.minY, width: colW, height: reportRowH), seconds: seconds, weight: .medium)
+        }
+
+        // Week total
+        let weekTotal = (0..<7).reduce(0.0) { $0 + dailySum(row.members, day: $1) }
+        drawHourCell(CGRect(x: totalColX, y: row.headerRect.minY, width: reportTotalColW, height: reportRowH), seconds: weekTotal, weight: .bold)
+
+        // Label(s)
+        if row.isGroup {
+            let title = "\(row.members[0]) +\(row.members.count - 1)"
+            drawLabelChip(CGRect(x: labelColX + reportSidePad, y: row.headerRect.minY + 3, width: reportLabelColW - reportSidePad * 2, height: reportRowH - 6),
+                         text: title, color: accent, fontSize: 12, weight: .semibold)
+            for (project, rect) in row.labelRects {
+                drawMemberLabel(rect, project: project, dimmed: dragActive && dragProject == project)
+            }
+        } else {
+            let project = row.members[0]
+            drawLabelChip(row.labelRects[0].rect.insetBy(dx: 0, dy: 3),
+                         text: project == "Break" ? "⏸ Break" : project,
+                         color: accent, fontSize: 12, weight: .medium,
+                         dimmed: dragActive && dragProject == project)
+        }
+    }
+
+    private func drawFooter(below rows: [ReportRowLayout]) {
+        let y = (rows.last?.frame.maxY ?? reportHeaderH) + reportRowGap
+        NSColor.separatorColor.withAlphaComponent(0.3).setFill()
+        NSRect(x: 0, y: y - reportRowGap / 2, width: bounds.width, height: 0.5).fill()
+
+        for i in 0..<7 {
+            let seconds = perProject.values.reduce(0.0) { $0 + $1[i] }
+            drawHourCell(CGRect(x: dayX(i), y: y, width: colW, height: reportRowH), seconds: seconds, weight: .bold)
+        }
+        let grand = perProject.values.reduce(0.0) { $0 + $1.reduce(0, +) }
+        drawHourCell(CGRect(x: totalColX, y: y, width: reportTotalColW, height: reportRowH), seconds: grand, weight: .bold)
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        let str = NSAttributedString(string: "All projects", attributes: attrs)
+        str.draw(at: NSPoint(x: labelColX + reportSidePad, y: y + (reportRowH - str.size().height) / 2))
+    }
+
+    private func drawHourCell(_ rect: CGRect, seconds: TimeInterval, weight: NSFont.Weight) {
+        guard seconds > 0 else {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
+                .foregroundColor: NSColor.quaternaryLabelColor
+            ]
+            drawCentered("—", in: rect, attrs: attrs)
+            return
+        }
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: weight),
+            .foregroundColor: NSColor.labelColor
+        ]
+        drawCentered(decimalHours(seconds), in: rect, attrs: attrs)
+    }
+
+    private func drawLabelChip(_ rect: CGRect, text: String, color: NSColor, fontSize: CGFloat, weight: NSFont.Weight, dimmed: Bool = false) {
+        let alpha: CGFloat = dimmed ? 0.2 : 1
+        color.withAlphaComponent(0.45 * alpha).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+        color.withAlphaComponent(0.75 * alpha).setStroke()
+        let border = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 5, yRadius: 5)
+        border.lineWidth = 0.5
+        border.stroke()
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: weight),
+            .foregroundColor: NSColor.labelColor.withAlphaComponent(dimmed ? 0.3 : 0.95)
+        ]
+        drawClipped(text, in: rect.insetBy(dx: 7, dy: 0), attrs: attrs)
+    }
+
+    private func drawMemberLabel(_ rect: CGRect, project: String, dimmed: Bool) {
+        let color = projectColor(project)
+        let chip = CGRect(x: rect.minX, y: rect.minY + 1, width: rect.width, height: rect.height - 2)
+        color.withAlphaComponent(dimmed ? 0.08 : 0.3).setFill()
+        NSBezierPath(roundedRect: chip, xRadius: 4, yRadius: 4).fill()
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .regular),
+            .foregroundColor: NSColor.labelColor.withAlphaComponent(dimmed ? 0.3 : 0.85)
+        ]
+        drawClipped(project == "Break" ? "⏸ Break" : project, in: chip.insetBy(dx: 6, dy: 0), attrs: attrs)
+    }
+
+    private func drawDragGhost(_ project: String) {
+        let color = projectColor(project)
+        let text = project == "Break" ? "⏸ Break" : project
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11.5, weight: .semibold),
+            .foregroundColor: NSColor.labelColor
+        ]
+        let str = NSAttributedString(string: text, attributes: attrs)
+        let sz = str.size()
+        let rect = CGRect(x: dragPoint.x - sz.width / 2 - 8, y: dragPoint.y - 11, width: sz.width + 16, height: 22)
+
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowBlurRadius = 6
+        shadow.shadowOffset = NSSize(width: 0, height: -2)
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.3)
+        shadow.set()
+        color.withAlphaComponent(0.9).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+        NSGraphicsContext.restoreGraphicsState()
+
+        str.draw(at: NSPoint(x: rect.minX + 8, y: rect.minY + (rect.height - sz.height) / 2))
+    }
+
+    private func drawCentered(_ text: String, in rect: CGRect, attrs: [NSAttributedString.Key: Any]) {
+        let str = NSAttributedString(string: text, attributes: attrs)
+        let sz = str.size()
+        str.draw(at: NSPoint(x: rect.minX + (rect.width - sz.width) / 2, y: rect.minY + (rect.height - sz.height) / 2))
+    }
+
+    private func drawClipped(_ text: String, in rect: CGRect, attrs: [NSAttributedString.Key: Any]) {
+        let str = NSAttributedString(string: text, attributes: attrs)
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: rect).setClip()
+        str.draw(at: NSPoint(x: rect.minX, y: rect.minY + (rect.height - str.size().height) / 2))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    // MARK: Drag to group / ungroup
+
+    private func labelHit(at p: CGPoint) -> String? {
+        for row in layoutRows() {
+            for (project, rect) in row.labelRects where rect.insetBy(dx: -4, dy: -1).contains(p) {
+                return project
+            }
+            // The group header counts as the whole group's first member for drop purposes.
+            if row.isGroup, row.headerRect.contains(p), p.x < reportLabelColW {
+                return row.members[0]
+            }
+        }
+        return nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        guard p.x < reportLabelColW, let project = labelHit(at: p) else { return }
+        dragProject = project
+        dragStart = p
+        dragPoint = p
+        dragActive = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard dragProject != nil else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        dragPoint = p
+        if !dragActive && hypot(p.x - dragStart.x, p.y - dragStart.y) > 4 { dragActive = true }
+        guard dragActive else { return }
+        let hit = labelHit(at: p)
+        dropTarget = hit == dragProject ? nil : hit
+        needsDisplay = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            dragProject = nil
+            dropTarget = nil
+            dragActive = false
+            needsDisplay = true
+        }
+        guard dragActive, let dragged = dragProject else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        let target = labelHit(at: p)
+
+        if let target, target != dragged {
+            group(dragged, with: target)
+        } else if target == nil {
+            ungroup(dragged)
+        }
+    }
+
+    private func group(_ project: String, with target: String) {
+        var next = groups.map { $0.filter { $0 != project } }
+        if let idx = next.firstIndex(where: { $0.contains(target) }) {
+            next[idx].append(project)
+        } else {
+            next.append([target, project])
+        }
+        commit(next)
+    }
+
+    private func ungroup(_ project: String) {
+        let next = groups.map { $0.filter { $0 != project } }
+        commit(next)
+    }
+
+    private func commit(_ next: [[String]]) {
+        groups = next.filter { $0.count > 1 }
+        onGroupsChanged?(groups)
+        needsDisplay = true
     }
 }
