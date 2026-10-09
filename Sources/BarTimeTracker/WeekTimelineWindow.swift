@@ -396,7 +396,8 @@ class WeekTimelineWindow: NSWindow {
             let visual   = buildVisualSpans(events: events, cap: cap)
             let logical  = TimeCalculations.buildTimeSpans(from: events, projectEntries: projects, now: now)
             let firstOn  = visual.first?.start
-            let spanEnd  = visual.last?.end
+            // The last project ends where the calculation ends it (first hard off after its last entry), not at the day's last screen event.
+            let spanEnd  = logical.last.flatMap { $0.isActive ? nil : $0.end } ?? visual.last?.end
             let projTS   = buildProjectTimespans(entries: projects, firstOnTime: firstOn, spanEndTime: spanEnd)
             return DayColumnData(date: day, visualSpans: visual, logicalSpans: logical, projects: projects, projectTimespans: projTS)
         }
