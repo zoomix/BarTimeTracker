@@ -57,6 +57,55 @@ public struct ProjectDuration {
 
 public enum TimeCalculations {
 
+    public static let loggedOutMarker = "~logged out~"
+    public static let resumedMarker = "~resumed~"
+
+    /// Make a day's data honour "Log out for the day": nothing counts between a `~logged out~` marker and the
+    /// next `~resumed~` (or the end of the data). Screen events and project entries in that window are dropped
+    /// and the screen is closed with an `off` at the logout time (and reopened with an `on` at the resume time),
+    /// so spans end where the user logged out instead of running on while the Mac stays awake.
+    /// All `~` marker entries are removed from the result.
+    public static func applyLogouts(events: [ScreenEvent], entries: [ProjectEntry]) -> (events: [ScreenEvent], entries: [ProjectEntry]) {
+        let sorted = entries.sorted { $0.time < $1.time }
+        var windows: [(start: Date, end: Date?)] = []
+        var open: Date?
+        for entry in sorted {
+            if entry.project == loggedOutMarker {
+                if open == nil { open = entry.time }
+            } else if entry.project == resumedMarker, let start = open {
+                windows.append((start, entry.time))
+                open = nil
+            }
+        }
+        if let start = open { windows.append((start, nil)) }
+
+        guard !windows.isEmpty else { return (events, sorted.filter { !$0.project.hasPrefix("~") }) }
+
+        func inWindow(_ t: Date) -> Bool {
+            windows.contains { t > $0.start && (($0.end == nil) || t < $0.end!) }
+        }
+
+        var keptEvents = events.filter { !inWindow($0.time) }
+        for w in windows {
+            keptEvents.append(ScreenEvent(kind: .off, time: w.start))
+            if let end = w.end { keptEvents.append(ScreenEvent(kind: .on, time: end)) }
+        }
+        keptEvents.sort { $0.time < $1.time }
+
+        // Entries claim the time leading up to them, so the marker is replaced by the project that was running
+        // when the user logged out. A Break at the resume time keeps the logged-out stretch out of the worked
+        // time, even when the project before and after is the same (which would otherwise merge into one span).
+        var keptEntries = sorted.filter { !$0.project.hasPrefix("~") && !inWindow($0.time) }
+        for w in windows {
+            if let running = keptEntries.last(where: { $0.time <= w.start }) {
+                keptEntries.append(ProjectEntry(project: running.project, time: w.start))
+            }
+            if let end = w.end { keptEntries.append(ProjectEntry(project: "Break", time: end)) }
+        }
+        keptEntries.sort { $0.time < $1.time }
+        return (keptEvents, keptEntries)
+    }
+
     /// Start of the day's first real work session.
     ///
     /// A sleeping Mac wakes for maintenance several times a night (an `on` immediately followed by an `off`),

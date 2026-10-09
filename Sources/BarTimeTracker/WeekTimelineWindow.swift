@@ -389,8 +389,9 @@ class WeekTimelineWindow: NSWindow {
             let dayStart = cal.startOfDay(for: day)
             let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
             let isToday = cal.isDateInToday(day)
-            let events   = data.screenEvents.filter { $0.time >= dayStart && $0.time < dayEnd }
-            let projects = data.projectEntries.filter { $0.time >= dayStart && $0.time < dayEnd }.sorted { $0.time < $1.time }
+            let (events, projects) = TimeCalculations.applyLogouts(
+                events: data.screenEvents.filter { $0.time >= dayStart && $0.time < dayEnd },
+                entries: data.projectEntries.filter { $0.time >= dayStart && $0.time < dayEnd })
             let cap      = isToday ? now : dayEnd
             let visual   = buildVisualSpans(events: events, cap: cap)
             let logical  = TimeCalculations.buildTimeSpans(from: events, projectEntries: projects, now: now)

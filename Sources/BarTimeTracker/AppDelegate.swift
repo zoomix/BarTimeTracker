@@ -451,10 +451,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
         let now = Date()
         for day in candidateDays {
             if menu.items.count >= 15 { break }
-            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
-            let dayProjects = appData.projectEntries
-                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
-                .sorted { $0.time < $1.time }
+            let (dayScreenEvents, dayProjects) = TimeCalculations.applyLogouts(
+                events: appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) },
+                entries: appData.projectEntries.filter { cal.isDate($0.time, inSameDayAs: day) })
             let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
             let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: now)
             let worked = TimeCalculations.workedTime(spans: spans, entries: dayProjects, firstOnTime: firstOnTime, now: now)
@@ -471,10 +470,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
 
     func addDayItems(to menu: NSMenu, date: Date, appData: AppData, timeFmt: DateFormatter) {
         let cal = Calendar.current
-        let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: date) }
-        let dayProjects = appData.projectEntries
-            .filter { cal.isDate($0.time, inSameDayAs: date) && !$0.project.hasPrefix("~") }
-            .sorted { $0.time < $1.time }
+        let (dayScreenEvents, dayProjects) = TimeCalculations.applyLogouts(
+            events: appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: date) },
+            entries: appData.projectEntries.filter { cal.isDate($0.time, inSameDayAs: date) })
         let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
 
         let now = Date()
@@ -719,10 +717,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, TimeDataStor
         let days = Array(Set(allDates)).sorted()
 
         for day in days {
-            let dayScreenEvents = appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) }
-            let dayProjects = appData.projectEntries
-                .filter { cal.isDate($0.time, inSameDayAs: day) && !$0.project.hasPrefix("~") }
-                .sorted { $0.time < $1.time }
+            let (dayScreenEvents, dayProjects) = TimeCalculations.applyLogouts(
+                events: appData.screenEvents.filter { cal.isDate($0.time, inSameDayAs: day) },
+                entries: appData.projectEntries.filter { cal.isDate($0.time, inSameDayAs: day) })
             let firstOnTime = TimeCalculations.dayStartTime(events: dayScreenEvents, projectEntries: dayProjects)
             let dayStart = firstOnTime ?? day
             let spans = TimeCalculations.buildTimeSpans(from: dayScreenEvents, projectEntries: dayProjects, now: Date())
